@@ -1,0 +1,50 @@
+services:
+  # Backend API Service
+  - type: web
+    name: lorawan-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lorawan-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lorawan-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+
+  # Celery Worker Service
+  - type: worker
+    name: lorawan-worker
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && celery -A tasks worker --loglevel=info
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lorawan-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: lorawan-redis
+          property: connectionString
+
+  # Redis Service (for Celery broker)
+  - type: redis
+    name: lorawan-redis
+    plan: starter  # Free tier
+    maxmemoryPolicy: noeviction
+    ipAllowList: []  # Allow all IPs
+
+databases:
+  # PostgreSQL Database
+  - name: lorawan-db
+    plan: starter  # Free tier
