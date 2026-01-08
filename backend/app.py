@@ -15,9 +15,12 @@ from models_auth import User
 try:
     from tasks import save_sensor_data
     CELERY_AVAILABLE = True
+    print(" Celery tasks imported successfully")
 except Exception as e:
-    print(f"⚠️  Celery not available: {e}. Using direct database saves.")
+    print(f"  Celery not available: {e}")
+    print("   Using direct database saves (no background processing)")
     CELERY_AVAILABLE = False
+    save_sensor_data = None  # Set to None to avoid NameError
 
 # Import authentication router
 from routers.auth import router as auth_router
@@ -80,48 +83,47 @@ async def receive_sensor_data(
     - Saves to database (with Celery queue if available, direct save if not)
     """
     try:
-        # Try Celery first if available
         if CELERY_AVAILABLE:
-            try:
-                data_dict = data.model_dump()
-                data_dict['timestamp'] = data.timestamp.isoformat()
-                data_dict['user_id'] = current_user.id
-                task = save_sensor_data.delay(data_dict)
-                
-                return SensorDataResponse(
-                    status="success",
-                    message="Data received and queued for processing",
-                    job_id=task.id
-                )
-            except Exception as celery_error:
-                print(f"⚠️  Celery error: {celery_error}. Falling back to direct save.")
-                # Fallback to direct save if Celery fails
-                pass
-        
-        # Direct database save (no Celery or Celery failed)
-        reading = SensorReading(
-            user_id=current_user.id,
-            gateway_id=data.gateway_id,
-            node_id=data.node_id,
-            timestamp=data.timestamp,
-            humidity=data.humidity,
-            moisture=data.moisture,
-            temperature=data.temperature,
-            battery_voltage=data.battery_voltage,
-            measurements=data.measurements
-        )
-        db.add(reading)
-        db.commit()
-        db.refresh(reading)
-        
-        return SensorDataResponse(
-            status="success",
-            message="Data saved successfully (direct)",
-            job_id=None
-        )
+            # Use Celery queue (non-blocking)
+            data_dict = data.model_dump()
+            data_dict['timestamp'] = data.timestamp.isoformat()
+            data_dict['user_id'] = current_user.id
+            task = save_sensor_data.delay(data_dict)
+            
+            return SensorDataResponse(
+                status="success",
+                message="Data received and queued for processing",
+                job_id=task.id
+            )
+        else:
+            # Direct database save (no Celery)
+            reading = SensorReading(
+                user_id=current_user.id,
+                gateway_id=data.gateway_id,
+                node_id=data.node_id,
+                timestamp=data.timestamp,
+                humidity=data.humidity,
+                moisture=data.moisture,
+                temperature=data.temperature,
+                battery_voltage=data.battery_voltage,
+                measurements=data.measurements
+            )
+            db.add(reading)
+            db.commit()
+            db.refresh(reading)
+            
+            return SensorDataResponse(
+                status="success",
+                message="Data saved successfully",
+                job_id=None
+            )
     
     except Exception as e:
-        db.rollback()
+        if db:
+            db.rollback()
+        print(f"❌ Error saving sensor data: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to save data: {str(e)}")
 
 
