@@ -78,7 +78,7 @@ function Login() {
           <div className="form-group">
             <label htmlFor="email">Email Address</label>
             <input
-              type="email"
+              type="text"
               id="email"
               name="email"
               value={formData.email}
@@ -171,7 +171,7 @@ function Login() {
 
       <div className="login-info">
         <div className="info-content">
-          <h2>SensorVault</h2>
+          <h2>LoRaWAN Data Collection System</h2>
           <p>Monitor and manage your IoT sensor network with real-time data visualization and analytics.</p>
           
           <div className="features-list">
