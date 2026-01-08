@@ -1,0 +1,91 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: lorawan_postgres
+    environment:
+      POSTGRES_DB: lorawan_db
+      POSTGRES_USER: lorawan_user
+      POSTGRES_PASSWORD: lorawan_pass
+    ports:
+      - "5433:5432"  # Changed to 5433 to avoid conflict
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lorawan_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (Queue + Cache)
+  redis:
+    image: redis:7-alpine
+    container_name: lorawan_redis
+    command: redis-server --appendonly yes --appendfsync everysec
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lorawan_backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://lorawan_user:lorawan_pass@postgres:5432/lorawan_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker (Background Processing)
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lorawan_worker
+    environment:
+      DATABASE_URL: postgresql://lorawan_user:lorawan_pass@postgres:5432/lorawan_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: celery -A tasks worker --loglevel=info --concurrency=4
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lorawan_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  redis_data:

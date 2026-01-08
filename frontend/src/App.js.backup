@@ -1,0 +1,377 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import axios from 'axios';
+import './App.css';
+import DataTable from './components/DataTable';
+import Stats from './components/Stats';
+import Sidebar from './components/Sidebar';
+import ManualEntry from './pages/ManualEntry';
+import DataExport from './pages/DataExport';
+
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+function App() {
+  const [data, setData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [gateways, setGateways] = useState([]);
+  const [nodes, setNodes] = useState([]);
+  const [selectedGateway, setSelectedGateway] = useState('');
+  const [selectedNode, setSelectedNode] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [timeRange, setTimeRange] = useState('24');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [apiStatus, setApiStatus] = useState('checking');
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [historicalData, setHistoricalData] = useState({});
+
+  // Mock current user (will be replaced with actual auth later)
+  const currentUser = {
+    name: 'Admin User',
+    email: 'admin@fillxpert.com'
+  };
+
+  // Check API health
+  const checkApiHealth = useCallback(async () => {
+    try {
+      await axios.get(`${API_URL}/`, { timeout: 3000 });
+      setApiStatus('connected');
+      setError(null);
+    } catch (err) {
+      setApiStatus('disconnected');
+      setError('API connection failed');
+    }
+  }, []);
+
+  // Fetch data from API
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setIsRefreshing(true);
+      setError(null);
+      
+      const params = {
+        limit: 1000,
+        hours: parseInt(timeRange)
+      };
+      if (selectedGateway) params.gateway_id = selectedGateway;
+      if (selectedNode) params.node_id = selectedNode;
+      
+      const response = await axios.get(`${API_URL}/api/sensor-data`, { params });
+      setData(response.data);
+      setFilteredData(response.data);
+      setLastUpdate(new Date());
+      setApiStatus('connected');
+      
+      // Build historical data for sparklines
+      buildHistoricalData(response.data);
+      
+      setTimeout(() => setIsRefreshing(false), 300);
+      
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to fetch sensor data');
+      setApiStatus('disconnected');
+      setIsRefreshing(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedGateway, selectedNode, timeRange]);
+
+  // Build historical data for sparklines (last 10 readings per node)
+  const buildHistoricalData = (readings) => {
+    const history = {};
+    
+    readings.forEach(reading => {
+      const key = `${reading.gateway_id}-${reading.node_id}`;
+      if (!history[key]) {
+        history[key] = {
+          humidity: [],
+          temperature: [],
+          battery_voltage: [],
+          moisture: []
+        };
+      }
+      
+      // Keep last 10 readings for each metric
+      if (reading.humidity !== null) {
+        history[key].humidity.unshift(reading.humidity);
+        if (history[key].humidity.length > 10) history[key].humidity.pop();
+      }
+      if (reading.temperature !== null) {
+        history[key].temperature.unshift(reading.temperature);
+        if (history[key].temperature.length > 10) history[key].temperature.pop();
+      }
+      if (reading.battery_voltage !== null && reading.battery_voltage !== undefined) {
+        history[key].battery_voltage.unshift(reading.battery_voltage);
+        if (history[key].battery_voltage.length > 10) history[key].battery_voltage.pop();
+      }
+      if (reading.moisture !== null) {
+        history[key].moisture.unshift(reading.moisture);
+        if (history[key].moisture.length > 10) history[key].moisture.pop();
+      }
+    });
+    
+    setHistoricalData(history);
+  };
+
+  // Fetch gateways list
+  const fetchGateways = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/gateways`);
+      setGateways(response.data);
+    } catch (err) {
+      console.error('Error fetching gateways:', err);
+    }
+  }, []);
+
+  // Fetch nodes list
+  const fetchNodes = useCallback(async () => {
+    try {
+      const params = selectedGateway ? { gateway_id: selectedGateway } : {};
+      const response = await axios.get(`${API_URL}/api/nodes`, { params });
+      setNodes(response.data);
+    } catch (err) {
+      console.error('Error fetching nodes:', err);
+    }
+  }, [selectedGateway]);
+
+  // Fetch stats
+  const fetchStats = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/stats`);
+      setStats(response.data);
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+    }
+  }, []);
+
+  // Filter data based on search term
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredData(data);
+      return;
+    }
+    
+    const filtered = data.filter(reading => 
+      reading.gateway_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      reading.node_id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredData(filtered);
+  }, [searchTerm, data]);
+
+  // Initial load
+  useEffect(() => {
+    checkApiHealth();
+    fetchGateways();
+    fetchStats();
+    fetchData();
+  }, [checkApiHealth, fetchGateways, fetchStats, fetchData]);
+
+  // Fetch nodes when gateway changes
+  useEffect(() => {
+    fetchNodes();
+  }, [fetchNodes]);
+
+  // Auto-refresh
+  useEffect(() => {
+    if (autoRefresh) {
+      const interval = setInterval(() => {
+        fetchData();
+        fetchStats();
+        checkApiHealth();
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [autoRefresh, fetchData, fetchStats, checkApiHealth]);
+
+  // Export to CSV
+  const exportToCSV = () => {
+    if (filteredData.length === 0) return;
+    
+    const headers = ['ID', 'Gateway', 'Node', 'Timestamp', 'Humidity', 'Moisture', 'Temperature'];
+    const csvData = filteredData.map(row => [
+      row.id,
+      row.gateway_id,
+      row.node_id,
+      new Date(row.timestamp).toLocaleString(),
+      row.humidity || '',
+      row.moisture || '',
+      row.temperature || ''
+    ]);
+    
+    const csv = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lorawan-data-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Reset filters
+  const resetFilters = () => {
+    setSelectedGateway('');
+    setSelectedNode('');
+    setSearchTerm('');
+    setTimeRange('24');
+  };
+
+  return (
+    <div className={`app ${isRefreshing ? 'refreshing' : ''}`}>
+      <Sidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)}
+        currentUser={currentUser}
+      />
+      
+      <div className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+        <header className="app-header">
+          <div className="header-left">
+            <button 
+              className="sidebar-toggle"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+            >
+              ☰
+            </button>
+            <h1 className="app-title">LoRaWAN Data Collection System</h1>
+            <div className="api-status">
+              <span className={`status-indicator status-${apiStatus}`}></span>
+              <span className="status-text">
+                {apiStatus === 'connected' ? 'Connected' : 
+                 apiStatus === 'disconnected' ? 'Disconnected' : 'Checking...'}
+              </span>
+            </div>
+          </div>
+          <div className="header-right">
+            {lastUpdate && (
+              <span className="last-update">
+                Last updated: {lastUpdate.toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+        </header>
+
+        <main className="app-main">
+          <div className="container">
+          
+          {error && (
+            <div className="alert alert-error">
+              <strong>Error:</strong> {error}
+              <button onClick={() => setError(null)} className="alert-close">×</button>
+            </div>
+          )}
+
+          {stats && <Stats stats={stats} />}
+
+          <div className="controls-panel">
+            <div className="controls-row">
+              <div className="control-group">
+                <label>Time Range</label>
+                <select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
+                  <option value="1">Last 1 Hour</option>
+                  <option value="6">Last 6 Hours</option>
+                  <option value="24">Last 24 Hours</option>
+                  <option value="168">Last 7 Days</option>
+                  <option value="720">Last 30 Days</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Gateway</label>
+                <select 
+                  value={selectedGateway} 
+                  onChange={(e) => {
+                    setSelectedGateway(e.target.value);
+                    setSelectedNode('');
+                  }}
+                >
+                  <option value="">All Gateways</option>
+                  {gateways.map(gw => (
+                    <option key={gw} value={gw}>{gw}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Node</label>
+                <select 
+                  value={selectedNode} 
+                  onChange={(e) => setSelectedNode(e.target.value)}
+                  disabled={!selectedGateway && nodes.length === 0}
+                >
+                  <option value="">All Nodes</option>
+                  {nodes.map(node => (
+                    <option key={node} value={node}>{node}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label>Search</label>
+                <input
+                  type="text"
+                  placeholder="Filter by gateway or node..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+            </div>
+
+            <div className="controls-row">
+              <div className="control-actions">
+                <button onClick={fetchData} className="btn btn-primary" disabled={loading}>
+                  {loading ? 'Loading...' : 'Refresh'}
+                </button>
+                <button onClick={resetFilters} className="btn btn-secondary">
+                  Reset Filters
+                </button>
+                <button onClick={exportToCSV} className="btn btn-secondary" disabled={filteredData.length === 0}>
+                  Export CSV
+                </button>
+              </div>
+
+              <div className="control-toggles">
+                <label className="toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={autoRefresh}
+                    onChange={(e) => setAutoRefresh(e.target.checked)}
+                  />
+                  <span>Auto-refresh (10s)</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <DataTable 
+            data={filteredData} 
+            loading={loading}
+            totalCount={data.length}
+            filteredCount={filteredData.length}
+            historicalData={historicalData}
+          />
+
+        </div>
+      </main>
+
+      <footer className="app-footer">
+        <p>LoRaWAN Data Collection System v1.0.0 | Total Readings: {stats?.total_readings || 0}</p>
+      </footer>
+      </div>
+    </div>
+  );
+}
+
+export default App;

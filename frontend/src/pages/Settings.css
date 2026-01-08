@@ -1,0 +1,90 @@
+.settings-page {
+  padding: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #18181b;
+  margin-bottom: 0.5rem;
+}
+
+.page-header p {
+  font-size: 14px;
+  color: #71717a;
+}
+
+.settings-section {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e4e4e7;
+  padding: 2rem;
+}
+
+.settings-section h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #18181b;
+  margin-bottom: 1rem;
+}
+
+.coming-soon {
+  font-size: 15px;
+  color: #71717a;
+  margin-bottom: 2rem;
+  font-style: italic;
+}
+
+.settings-preview {
+  background: #fafafa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #e4e4e7;
+}
+
+.settings-preview h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #18181b;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-preview ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.settings-preview li {
+  font-size: 14px;
+  color: #52525b;
+  margin-bottom: 0.75rem;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.settings-preview li:before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: #18181b;
+  font-weight: 600;
+}
+
+.settings-preview li:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 1rem;
+  }
+}
