@@ -1,7 +1,7 @@
 """
 Authentication-related database models
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, func
 from database import Base
 
 
@@ -51,3 +51,41 @@ class PasswordResetOTP(Base):
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class APIKey(Base):
+    """
+    API Key model for gateway authentication.
+    
+    Why API Keys?
+    - JWT tokens expire every hour → annoying for IoT gateways
+    - API keys can be set to never expire (or custom duration)
+    - Easier for friends/partners to test your system
+    - Industry standard (like Thingspeak, Adafruit IO, AWS IoT)
+    
+    Format: lora_<44 random characters>
+    Example: lora_ABC123xyz...
+    """
+    __tablename__ = "api_keys"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    key_name = Column(String(100), nullable=False)  # e.g., "Gateway 1", "Test Key"
+    key_value = Column(String(100), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # NULL = never expires
+    is_active = Column(Boolean, default=True)
+    
+    def to_dict(self, show_full_key=False):
+        """Convert to dictionary (hides full key by default for security)"""
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "key_name": self.key_name,
+            "key_preview": self.key_value[:10] + "..." if not show_full_key else self.key_value,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_used_at": self.last_used_at.isoformat() if self.last_used_at else None,
+            "expires_at": self.expires_at.isoformat() if self.expires_at else "Never",
+            "is_active": self.is_active
+        }

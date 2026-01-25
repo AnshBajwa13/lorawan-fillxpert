@@ -6,12 +6,14 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import random
 import string
+import secrets
 
 from database import get_db
-from models_auth import User, PasswordResetOTP
+from models_auth import User, PasswordResetOTP, APIKey
 from schemas_auth import (
     UserRegister, UserLogin, Token, UserResponse,
-    PasswordReset, PasswordResetConfirm
+    PasswordReset, PasswordResetConfirm,
+    APIKeyCreate, APIKeyResponse, APIKeyList, APIKeyListItem, APIKeyExpiration
 )
 from auth import (
     hash_password, verify_password, authenticate_user,
@@ -238,3 +240,181 @@ def confirm_password_reset(data: PasswordResetConfirm, db: Session = Depends(get
     db.commit()
     
     return {"message": "Password reset successful"}
+
+
+# ============ API KEY ENDPOINTS ============
+# These allow users to create long-lived API keys for their IoT gateways
+# Instead of dealing with 1-hour JWT tokens
+
+@router.post("/api-keys", response_model=APIKeyResponse, status_code=status.HTTP_201_CREATED)
+def create_api_key(
+    key_data: APIKeyCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new API key for the authenticated user.
+    
+    Why API Keys?
+    - JWT tokens expire every hour → annoying for IoT gateways
+    - API keys can last forever (or custom duration)
+    - Share with friends/partners without sharing password
+    - Revoke anytime without changing password
+    
+    Usage after creation:
+        curl -X POST https://your-api.com/api/sensor-data \\
+             -H "X-API-Key: lora_your_key_here" \\
+             -H "Content-Type: application/json" \\
+             -d '{"device_id": "sensor_01", "temperature": 25.5}'
+    """
+    # Generate secure random key: lora_<44 chars>
+    key_value = f"lora_{secrets.token_urlsafe(32)}"
+    
+    # Calculate expiration
+    expires_at = None
+    if key_data.expiration == APIKeyExpiration.one_year:
+        expires_at = datetime.utcnow() + timedelta(days=365)
+    elif key_data.expiration == APIKeyExpiration.thirty_days:
+        expires_at = datetime.utcnow() + timedelta(days=30)
+    elif key_data.expiration == APIKeyExpiration.seven_days:
+        expires_at = datetime.utcnow() + timedelta(days=7)
+    elif key_data.expiration == APIKeyExpiration.custom and key_data.custom_expires_at:
+        expires_at = key_data.custom_expires_at
+    # else: never expires (expires_at = None)
+    
+    # Create API key
+    api_key = APIKey(
+        user_id=current_user.id,
+        key_name=key_data.key_name,
+        key_value=key_value,
+        expires_at=expires_at,
+        is_active=True
+    )
+    
+    db.add(api_key)
+    db.commit()
+    db.refresh(api_key)
+    
+    return APIKeyResponse(
+        id=api_key.id,
+        key_name=api_key.key_name,
+        key_value=key_value,  # Show full key ONLY at creation!
+        expires_at=expires_at.isoformat() if expires_at else "Never",
+        message="🔑 Save this key! It won't be shown again."
+    )
+
+
+@router.get("/api-keys", response_model=APIKeyList)
+def list_api_keys(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    List all API keys for the authenticated user.
+    
+    Note: Full key values are NOT shown (only preview).
+    This is for security - if someone sees your screen, they can't steal your keys.
+    """
+    keys = db.query(APIKey).filter(APIKey.user_id == current_user.id).all()
+    
+    key_list = []
+    for key in keys:
+        key_list.append(APIKeyListItem(
+            id=key.id,
+            key_name=key.key_name,
+            key_preview=key.key_value[:10] + "...",
+            created_at=key.created_at,
+            last_used_at=key.last_used_at,
+            expires_at=key.expires_at.isoformat() if key.expires_at else "Never",
+            is_active=key.is_active
+        ))
+    
+    return APIKeyList(keys=key_list, total=len(key_list))
+
+
+@router.delete("/api-keys/{key_id}", status_code=status.HTTP_200_OK)
+def revoke_api_key(
+    key_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Permanently delete an API key.
+    
+    Use this when:
+    - Key was compromised
+    - Gateway is being decommissioned
+    - No longer needed
+    """
+    api_key = db.query(APIKey).filter(
+        APIKey.id == key_id,
+        APIKey.user_id == current_user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found"
+        )
+    
+    db.delete(api_key)
+    db.commit()
+    
+    return {"message": f"API key '{api_key.key_name}' has been revoked"}
+
+
+@router.patch("/api-keys/{key_id}/deactivate", status_code=status.HTTP_200_OK)
+def deactivate_api_key(
+    key_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Temporarily disable an API key without deleting it.
+    
+    Use this when:
+    - Suspicious activity detected
+    - Gateway maintenance
+    - Want to pause without losing key
+    """
+    api_key = db.query(APIKey).filter(
+        APIKey.id == key_id,
+        APIKey.user_id == current_user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found"
+        )
+    
+    api_key.is_active = False
+    db.commit()
+    
+    return {"message": f"API key '{api_key.key_name}' has been deactivated"}
+
+
+@router.patch("/api-keys/{key_id}/activate", status_code=status.HTTP_200_OK)
+def activate_api_key(
+    key_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Re-enable a previously deactivated API key.
+    """
+    api_key = db.query(APIKey).filter(
+        APIKey.id == key_id,
+        APIKey.user_id == current_user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found"
+        )
+    
+    api_key.is_active = True
+    db.commit()
+    
+    return {"message": f"API key '{api_key.key_name}' has been activated"}

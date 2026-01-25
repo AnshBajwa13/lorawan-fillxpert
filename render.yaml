@@ -1,4 +1,4 @@
-services:
+﻿services:
   # Backend API Service
   - type: web
     name: lorawan-backend
@@ -20,7 +20,21 @@ services:
       - key: ENVIRONMENT
         value: production
 
-  # Celery Worker Service
+  # Frontend Static Site
+  - type: web
+    name: lorawan-fillxpert
+    runtime: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/build
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://lorawan-backend-wxgp.onrender.com
+
+  # Celery Worker Service  
   - type: worker
     name: lorawan-worker
     runtime: python
@@ -40,11 +54,11 @@ services:
   # Redis Service (for Celery broker)
   - type: redis
     name: lorawan-redis
-    plan: starter  # Free tier
+    plan: starter
     maxmemoryPolicy: noeviction
-    ipAllowList: []  # Allow all IPs
+    ipAllowList: []
 
 databases:
   # PostgreSQL Database
   - name: lorawan-db
-    plan: starter  # Free tier
+    plan: starter

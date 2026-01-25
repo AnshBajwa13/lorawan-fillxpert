@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
@@ -9,7 +9,7 @@ from database import get_db, init_db
 from models import SensorReading
 from schemas import SensorDataInput, SensorDataResponse, SensorReadingOutput
 from auth import get_current_user
-from models_auth import User
+from models_auth import User, APIKey
 
 # Try to import Celery tasks, fallback to direct save if not available
 try:
@@ -73,21 +73,76 @@ async def root():
 @app.post("/api/sensor-data", response_model=SensorDataResponse)
 async def receive_sensor_data(
     data: SensorDataInput, 
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """
-    Endpoint to receive sensor data from gateway
-    - Requires authentication (JWT token)
-    - Associates data with logged-in user
-    - Saves to database (with Celery queue if available, direct save if not)
+    Endpoint to receive sensor data from gateway.
+    
+    DUAL AUTHENTICATION (either works):
+    1. X-API-Key header (recommended for gateways) - never expires
+    2. Bearer token (used by frontend) - expires in 1 hour
+    
+    Example with API Key:
+        curl -X POST https://api.example.com/api/sensor-data \\
+             -H "X-API-Key: lora_your_key_here" \\
+             -H "Content-Type: application/json" \\
+             -d '{"gateway_id": "gw01", "node_id": "sensor01", ...}'
+    
+    Example with Bearer Token:
+        curl -X POST https://api.example.com/api/sensor-data \\
+             -H "Authorization: Bearer eyJhbGciOiJI..." \\
+             -H "Content-Type: application/json" \\
+             -d '{"gateway_id": "gw01", "node_id": "sensor01", ...}'
     """
+    user = None
+    
+    # Try API Key first (preferred for gateways)
+    if x_api_key:
+        api_key = db.query(APIKey).filter(
+            APIKey.key_value == x_api_key,
+            APIKey.is_active == True
+        ).first()
+        
+        if not api_key:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or inactive API key"
+            )
+        
+        # Check if key is expired
+        if api_key.expires_at and api_key.expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=401,
+                detail="API key has expired"
+            )
+        
+        # Update last_used_at timestamp
+        api_key.last_used_at = datetime.utcnow()
+        db.commit()
+        
+        # Get user from API key
+        user = db.query(User).filter(User.id == api_key.user_id).first()
+        
+    # Fall back to Bearer token
+    elif current_user:
+        user = current_user
+    
+    # No authentication provided
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Provide X-API-Key header or Bearer token.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+    
     try:
         if CELERY_AVAILABLE:
             # Use Celery queue (non-blocking)
             data_dict = data.model_dump()
             data_dict['timestamp'] = data.timestamp.isoformat()
-            data_dict['user_id'] = current_user.id
+            data_dict['user_id'] = user.id
             task = save_sensor_data.delay(data_dict)
             
             return SensorDataResponse(
@@ -98,7 +153,7 @@ async def receive_sensor_data(
         else:
             # Direct database save (no Celery)
             reading = SensorReading(
-                user_id=current_user.id,
+                user_id=user.id,
                 gateway_id=data.gateway_id,
                 node_id=data.node_id,
                 timestamp=data.timestamp,
