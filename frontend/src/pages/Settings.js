@@ -129,7 +129,7 @@ function Settings() {
       <div className="settings-section">
         <div className="section-header">
           <div>
-            <h3>🔑 API Keys</h3>
+            <h3> API Keys</h3>
             <p className="section-description">
               Use API keys for your IoT gateways. They don't expire (unless you set one).
             </p>
@@ -250,9 +250,9 @@ function Settings() {
               </>
             ) : (
               <>
-                <h3>✅ API Key Created!</h3>
+                <h3>✔️ API Key Created!</h3>
                 <div className="warning-box">
-                  ⚠️ Copy this key now! It won't be shown again.
+                   Copy this key now! It won't be shown again.
                 </div>
                 <div className="key-display">
                   <code>{createdKey.key_value}</code>
@@ -286,7 +286,7 @@ function Settings() {
 
       {/* Other Settings Section */}
       <div className="settings-section">
-        <h3>⚙️ System Settings</h3>
+        <h3> System Settings</h3>
         <p className="coming-soon">More settings coming soon...</p>
         <div className="settings-preview">
           <h4>Planned Features:</h4>
