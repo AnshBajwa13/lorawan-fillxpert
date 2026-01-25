@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from database import get_db, init_db
 from models import SensorReading
 from schemas import SensorDataInput, SensorDataResponse, SensorReadingOutput
-from auth import get_current_user
+from auth import get_current_user, get_current_user_optional
 from models_auth import User, APIKey
 
 # Try to import Celery tasks, fallback to direct save if not available
@@ -75,7 +75,7 @@ async def receive_sensor_data(
     data: SensorDataInput, 
     db: Session = Depends(get_db),
     x_api_key: Optional[str] = Header(None, alias="X-API-Key"),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     Endpoint to receive sensor data from gateway.

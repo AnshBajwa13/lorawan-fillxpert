@@ -22,6 +22,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7  # 7 days
 
 # Security scheme for bearer token
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)  # For optional auth
 
 
 def hash_password(password: str) -> str:
@@ -161,6 +162,35 @@ def get_current_user(
         )
     
     return user
+
+
+def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """
+    Optional version of get_current_user.
+    Returns None instead of raising an exception if no token is provided.
+    Used for endpoints that accept either API key OR Bearer token.
+    """
+    if credentials is None:
+        return None
+    
+    try:
+        token = credentials.credentials
+        payload = decode_token(token)
+        email: str = payload.get("sub")
+        
+        if email is None:
+            return None
+        
+        user = db.query(User).filter(User.email == email).first()
+        if user is None or not user.is_active:
+            return None
+        
+        return user
+    except:
+        return None
 
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
