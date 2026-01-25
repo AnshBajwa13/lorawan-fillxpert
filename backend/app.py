@@ -139,39 +139,43 @@ async def receive_sensor_data(
     
     try:
         if CELERY_AVAILABLE:
-            # Use Celery queue (non-blocking)
-            data_dict = data.model_dump()
-            data_dict['timestamp'] = data.timestamp.isoformat()
-            data_dict['user_id'] = user.id
-            task = save_sensor_data.delay(data_dict)
-            
-            return SensorDataResponse(
-                status="success",
-                message="Data received and queued for processing",
-                job_id=task.id
-            )
-        else:
-            # Direct database save (no Celery)
-            reading = SensorReading(
-                user_id=user.id,
-                gateway_id=data.gateway_id,
-                node_id=data.node_id,
-                timestamp=data.timestamp,
-                humidity=data.humidity,
-                moisture=data.moisture,
-                temperature=data.temperature,
-                battery_voltage=data.battery_voltage,
-                measurements=data.measurements
-            )
-            db.add(reading)
-            db.commit()
-            db.refresh(reading)
-            
-            return SensorDataResponse(
-                status="success",
-                message="Data saved successfully",
-                job_id=None
-            )
+            try:
+                # Try Celery queue (non-blocking)
+                data_dict = data.model_dump()
+                data_dict['timestamp'] = data.timestamp.isoformat()
+                data_dict['user_id'] = user.id
+                task = save_sensor_data.delay(data_dict)
+                
+                return SensorDataResponse(
+                    status="success",
+                    message="Data received and queued for processing",
+                    job_id=task.id
+                )
+            except Exception as celery_error:
+                # Celery failed (Redis down?), fall back to direct save
+                print(f"⚠️ Celery failed, using direct save: {celery_error}")
+        
+        # Direct database save (no Celery or Celery failed)
+        reading = SensorReading(
+            user_id=user.id,
+            gateway_id=data.gateway_id,
+            node_id=data.node_id,
+            timestamp=data.timestamp,
+            humidity=data.humidity,
+            moisture=data.moisture,
+            temperature=data.temperature,
+            battery_voltage=data.battery_voltage,
+            measurements=data.measurements
+        )
+        db.add(reading)
+        db.commit()
+        db.refresh(reading)
+        
+        return SensorDataResponse(
+            status="success",
+            message="Data saved successfully",
+            job_id=None
+        )
     
     except Exception as e:
         if db:
