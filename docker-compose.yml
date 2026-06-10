@@ -1,29 +1,50 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# FillXpert — Production docker-compose
+#
+# What runs here (on AWS EC2 / any Linux server):
+#   postgres  — PostgreSQL database
+#   redis     — Job queue + cache
+#   backend   — FastAPI + MQTT subscriber + WebSocket bridge
+#   worker    — Celery background worker
+#
+# What does NOT run here:
+#   frontend  — Deployed separately on Vercel (free CDN)
+#
+# How to use:
+#   1. Copy .env.example → .env and fill in values
+#   2. docker-compose up -d
+#   3. docker-compose logs -f backend   (watch logs)
+# ──────────────────────────────────────────────────────────────────────────────
+
 services:
-  # PostgreSQL Database
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: lorawan_postgres
+    container_name: fillxpert_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: lorawan_db
-      POSTGRES_USER: lorawan_user
-      POSTGRES_PASSWORD: lorawan_pass
+      POSTGRES_DB:       ${POSTGRES_DB:-lorawan_db}
+      POSTGRES_USER:     ${POSTGRES_USER:-lorawan_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lorawan_pass}
     ports:
-      - "5433:5432"  # Changed to 5433 to avoid conflict
+      - "5432:5432"       # internal only — do NOT expose 5432 in EC2 Security Group
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U lorawan_user"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lorawan_user}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Redis (Queue + Cache)
+  # ── Redis ───────────────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: lorawan_redis
+    container_name: fillxpert_redis
+    restart: unless-stopped
     command: redis-server --appendonly yes --appendfsync everysec
     ports:
-      - "6379:6379"
+      - "6379:6379"       # internal only
     volumes:
       - redis_data:/data
     healthcheck:
@@ -32,59 +53,46 @@ services:
       timeout: 3s
       retries: 5
 
-  # FastAPI Backend
+  # ── FastAPI Backend ─────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: lorawan_backend
+    image: fillxpert-backend:latest
+    container_name: fillxpert_backend
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000:8000"       # expose to internet — add in EC2 Security Group
+    env_file: .env        # loads all variables from .env file
     environment:
-      DATABASE_URL: postgresql://lorawan_user:lorawan_pass@postgres:5432/lorawan_db
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lorawan_user}:${POSTGRES_PASSWORD:-lorawan_pass}@postgres:5432/${POSTGRES_DB:-lorawan_db}
+      REDIS_URL:    redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+    # NO volume mount in production — code is baked into Docker image via COPY
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --workers 2
 
-  # Celery Worker (Background Processing)
+  # ── Celery Worker ───────────────────────────────────────────────────────────
   worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: lorawan_worker
+    image: fillxpert-backend:latest   # reuses same image as backend
+    container_name: fillxpert_worker
+    restart: unless-stopped
+    env_file: .env
     environment:
-      DATABASE_URL: postgresql://lorawan_user:lorawan_pass@postgres:5432/lorawan_db
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lorawan_user}:${POSTGRES_PASSWORD:-lorawan_pass}@postgres:5432/${POSTGRES_DB:-lorawan_db}
+      REDIS_URL:    redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-    command: celery -A tasks worker --loglevel=info --concurrency=4
-
-  # Frontend (React)
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: lorawan_frontend
-    ports:
-      - "3000:3000"
-    environment:
-      REACT_APP_API_URL: http://localhost:8000
-    depends_on:
-      - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    command: celery -A tasks worker --loglevel=info --concurrency=2
 
 volumes:
   postgres_data:
