@@ -9,7 +9,7 @@ settings = get_settings()
 
 # Initialize Celery
 celery_app = Celery(
-    'lorawan_tasks',
+    'fillxpert_tasks',
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL
 )

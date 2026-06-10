@@ -5,31 +5,38 @@ from datetime import datetime
 
 
 class SensorReading(Base):
-    """Model for storing sensor readings from LoRaWAN nodes"""
+    """Model for storing sensor readings from eSIM field transmitter devices"""
     __tablename__ = "sensor_readings"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
-    gateway_id = Column(String(50), nullable=False, index=True)
-    node_id = Column(String(50), nullable=False, index=True)
+    gateway_id = Column(String(50), nullable=False, index=True)  # = device location (MQTT topic prefix)
+    node_id = Column(String(50), nullable=False, index=True)      # = device_id (transmitter firmware ID)
     timestamp = Column(DateTime, nullable=False, index=True)
     
     # Fixed standard fields (backward compatible)
     humidity = Column(Float, nullable=True)
     moisture = Column(Float, nullable=True)
     temperature = Column(Float, nullable=True)
-    battery_voltage = Column(Float, nullable=True)  # Battery monitoring
-    
+    battery_voltage = Column(Float, nullable=True)  # Battery monitoring (volts)
+
     # Dynamic measurements stored as JSON
     # Example: {"npk_n": 45.2, "npk_p": 23.1, "npk_k": 38.7, "ph": 6.8}
     measurements = Column(JSON, nullable=True)
-    
+
+    # MQTT-specific fields (added for device telemetry)
+    msg_id   = Column(String(24), nullable=True)    # dedup: unique per message (indexed below)
+    rssi_dbm = Column(Integer,    nullable=True)     # GSM signal strength dBm
+    trigger  = Column(String(20), nullable=True)     # schedule / manual / buffered
+    cfg_ver  = Column(Integer,    nullable=True)     # config version active on device
+
     created_at = Column(DateTime, server_default=func.now())
 
     # Composite index for faster queries
     __table_args__ = (
         Index('idx_user_gateway_node_timestamp', 'user_id', 'gateway_id', 'node_id', 'timestamp'),
         Index('idx_user_timestamp', 'user_id', 'timestamp'),
+        Index('idx_msg_id', 'msg_id'),
     )
 
     def to_dict(self):

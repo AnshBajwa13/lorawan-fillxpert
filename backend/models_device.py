@@ -1,0 +1,181 @@
+from sqlalchemy import (
+    Column, Integer, String, Float, DateTime, Boolean,
+    ForeignKey, Index, UniqueConstraint
+)
+from sqlalchemy.sql import func
+from database import Base
+
+
+# ---------------------------------------------------------------------------
+# Sensor type code → name mapping (matches firmware spec)
+# ---------------------------------------------------------------------------
+SENSOR_TYPE_MAP = {
+    "01": "moisture",
+    "02": "temperature",
+    "03": "npk",
+    "04": "ph",
+    "05": "ultrasonic",
+    "06": "humidity",
+}
+
+# Reverse map: name → code
+SENSOR_NAME_TO_CODE = {v: k for k, v in SENSOR_TYPE_MAP.items()}
+
+# Short key inside v{} → standard column name
+V_KEY_TO_COLUMN = {
+    "m":  "moisture",
+    "h":  "humidity",
+    "tp": "temperature",   # 'tp' used to avoid clash with 't' = transmitter ID
+}
+
+
+# ---------------------------------------------------------------------------
+# Device — one row per physical transmitter box
+# ---------------------------------------------------------------------------
+class Device(Base):
+    """
+    Registry of every physical transmitter (STM32 + Quectel + sensors).
+    Created by admin when deploying a device to the field.
+    Updated automatically when MQTT messages arrive.
+    """
+    __tablename__ = "devices"
+
+    device_id   = Column(String(50),  primary_key=True)    # e.g. "SNR001"
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+
+    # Human-readable metadata
+    name        = Column(String(100), nullable=True)        # "Field A – North corner"
+    location    = Column(String(100), nullable=True)        # "sangrur" — matches MQTT topic level
+    description = Column(String(255), nullable=True)
+
+    # Current sensor attached to this transmitter
+    sensor_type = Column(String(50),  nullable=True, default="moisture")
+
+    # Config state
+    cfg_version       = Column(Integer, nullable=True, default=0)  # version dashboard pushed
+    cfg_version_acked = Column(Integer, nullable=True, default=0)  # version device confirmed
+
+    # Live status (updated on every MQTT message)
+    is_online   = Column(Boolean,  nullable=False, default=False)
+    last_seen   = Column(DateTime, nullable=True)
+    battery_mv  = Column(Integer,  nullable=True)  # millivolts e.g. 3750
+    rssi_dbm    = Column(Integer,  nullable=True)  # e.g. -71
+
+    created_at  = Column(DateTime, server_default=func.now())
+    updated_at  = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    def to_dict(self):
+        return {
+            "device_id":         self.device_id,
+            "user_id":           self.user_id,
+            "name":              self.name,
+            "location":          self.location,
+            "description":       self.description,
+            "sensor_type":       self.sensor_type,
+            "cfg_version":       self.cfg_version,
+            "cfg_version_acked": self.cfg_version_acked,
+            "config_applied":    self.cfg_version == self.cfg_version_acked,
+            "is_online":         self.is_online,
+            "last_seen":         self.last_seen.isoformat() if self.last_seen else None,
+            "battery_mv":        self.battery_mv,
+            "battery_pct":       _mv_to_pct(self.battery_mv),
+            "rssi_dbm":          self.rssi_dbm,
+            "signal_label":      _rssi_label(self.rssi_dbm),
+            "created_at":        self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# DeviceConfig — history of every config pushed to a device
+# ---------------------------------------------------------------------------
+class DeviceConfig(Base):
+    """
+    Every time dashboard pushes a new config, a row is created here.
+    When device sends config/ack, we mark ack_received=True.
+    """
+    __tablename__ = "device_configs"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    device_id   = Column(String(50), ForeignKey("devices.device_id", ondelete="CASCADE"),
+                         nullable=False, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"),
+                         nullable=False)
+
+    # Config values (human-readable)
+    cfg_version = Column(Integer, nullable=False)
+    sensor_type = Column(String(50), nullable=False)
+    freq        = Column(Integer, nullable=False, default=2)   # readings per day
+    time1_hour  = Column(Integer, nullable=False, default=10)
+    time1_min   = Column(Integer, nullable=False, default=0)
+    time2_hour  = Column(Integer, nullable=True,  default=14)  # NULL = only 1 reading
+    time2_min   = Column(Integer, nullable=True,  default=0)
+
+    # Compact 12-char string sent to device via MQTT
+    # e.g. "011000140002"
+    payload_str = Column(String(12), nullable=False)
+
+    # Delivery tracking
+    published_at  = Column(DateTime, server_default=func.now())
+    ack_received  = Column(Boolean, nullable=False, default=False)
+    ack_at        = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("idx_device_cfg_version", "device_id", "cfg_version"),
+    )
+
+    def to_dict(self):
+        return {
+            "id":           self.id,
+            "device_id":    self.device_id,
+            "cfg_version":  self.cfg_version,
+            "sensor_type":  self.sensor_type,
+            "freq":         self.freq,
+            "time1":        f"{self.time1_hour:02d}:{self.time1_min:02d}",
+            "time2":        (f"{self.time2_hour:02d}:{self.time2_min:02d}"
+                             if self.time2_hour is not None else None),
+            "payload_str":  self.payload_str,
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "ack_received": self.ack_received,
+            "ack_at":       self.ack_at.isoformat() if self.ack_at else None,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Helper utilities
+# ---------------------------------------------------------------------------
+def _mv_to_pct(mv: int | None) -> int | None:
+    """Convert battery millivolts to rough percentage (3.0V=0%, 4.2V=100%)."""
+    if mv is None:
+        return None
+    pct = int((mv - 3000) / 12)   # 1200 mV range → 100%
+    return max(0, min(100, pct))
+
+
+def _rssi_label(rssi: int | None) -> str:
+    """Human-readable GSM signal label from RSSI dBm."""
+    if rssi is None:
+        return "unknown"
+    if rssi >= -70:
+        return "excellent"
+    if rssi >= -85:
+        return "good"
+    if rssi >= -100:
+        return "fair"
+    return "poor"
+
+
+def build_config_payload(sensor_type: str, time1_h: int, time1_m: int,
+                          time2_h: int | None, time2_m: int | None,
+                          freq: int) -> str:
+    """
+    Build the 12-character compact config string for the device firmware.
+
+    Format: [sensor_code:2][time1_H:2][time1_M:2][time2_H:2][time2_M:2][freq:2]
+    Example: "011000140002"  → moisture, 10:00 & 14:00, 2×/day
+    If freq=1 (one reading only): time2 slots set to "9999"
+    """
+    code = SENSOR_NAME_TO_CODE.get(sensor_type, "01")
+    if freq == 1 or time2_h is None:
+        return f"{code}{time1_h:02d}{time1_m:02d}9999{freq:02d}"
+    return f"{code}{time1_h:02d}{time1_m:02d}{time2_h:02d}{time2_m:02d}{freq:02d}"

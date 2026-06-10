@@ -13,23 +13,23 @@ function Stats({ stats }) {
 
       <div className="stat-card">
         <div className="stat-content">
-          <h3>Gateways</h3>
+          <h3>Locations</h3>
           <p className="stat-value">{stats.total_gateways}</p>
         </div>
       </div>
 
       <div className="stat-card">
         <div className="stat-content">
-          <h3>Sensor Nodes</h3>
+          <h3>Devices</h3>
           <p className="stat-value">{stats.total_nodes}</p>
         </div>
       </div>
 
       <div className="stat-card">
         <div className="stat-content">
-          <h3>Last Update</h3>
+          <h3>Last Reading</h3>
           <p className="stat-value small">
-            {stats.latest_reading_time 
+            {stats.latest_reading_time
               ? new Date(stats.latest_reading_time).toLocaleString()
               : 'No data'}
           </p>

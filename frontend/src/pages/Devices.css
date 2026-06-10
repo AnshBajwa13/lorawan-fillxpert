@@ -1,0 +1,189 @@
+/* ── Devices Page — Light Theme ──────────────────────────────── */
+.devices-page { width: 100%; color: #18181b; background: var(--bg, #fff); min-height: 100vh; }
+
+/* Header row */
+.devices-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 28px; gap: 16px; flex-wrap: wrap;
+}
+.devices-header h1 { font-size: 1.5rem; font-weight: 700; color: #18181b; margin-bottom: 4px; }
+.devices-header p  { font-size: 0.875rem; color: #71717a; }
+
+/* Register button */
+.btn-register {
+  padding: 9px 18px;
+  background: #18181b; color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 600;
+  cursor: pointer; transition: background 0.18s;
+  white-space: nowrap;
+}
+.btn-register:hover { background: #09090b; }
+
+/* Stats bar */
+.devices-stats {
+  display: flex; gap: 6px; align-items: center;
+  font-size: 0.875rem; color: #52525b;
+  margin-bottom: 20px;
+}
+.stat-sep { color: #d4d4d8; }
+.stat-online { color: #16a34a; font-weight: 600; }
+
+/* Device grid */
+.devices-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+/* Device card */
+.device-card {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  cursor: pointer;
+}
+.device-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border-color: #a1a1aa;
+}
+.device-card.online  { border-left: 3px solid #16a34a; }
+.device-card.offline { border-left: 3px solid #e4e4e7; }
+
+.device-card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 14px;
+}
+.device-name { font-size: 1rem; font-weight: 600; color: #18181b; margin-bottom: 2px; }
+.device-id   { font-size: 0.75rem; color: #71717a; font-family: monospace; }
+
+.device-status {
+  font-size: 0.7rem; font-weight: 600; padding: 3px 8px;
+  border-radius: 999px; white-space: nowrap;
+}
+.status-online  { background: #dcfce7; color: #16a34a; }
+.status-offline { background: #f4f4f5; color: #71717a; }
+
+.device-metrics {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; margin-bottom: 14px;
+}
+.metric-item { display: flex; flex-direction: column; gap: 2px; }
+.metric-label { font-size: 0.7rem; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+.metric-value { font-size: 0.95rem; font-weight: 600; color: #18181b; }
+.metric-value.good   { color: #16a34a; }
+.metric-value.warn   { color: #ea580c; }
+.metric-value.bad    { color: #dc2626; }
+.metric-value.muted  { color: #a1a1aa; }
+
+.device-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 12px; border-top: 1px solid #f4f4f5;
+}
+.device-location { font-size: 0.78rem; color: #71717a; }
+.device-sensor   { font-size: 0.78rem; color: #52525b; font-weight: 500; background: #f4f4f5; padding: 3px 8px; border-radius: 4px; }
+
+.btn-configure {
+  padding: 6px 14px; background: #fff; color: #18181b;
+  border: 1px solid #e4e4e7; border-radius: 6px;
+  font-size: 0.78rem; font-weight: 500; cursor: pointer;
+  transition: all 0.18s;
+}
+.btn-configure:hover { background: #18181b; color: #fff; border-color: #18181b; }
+
+/* Empty state */
+.devices-empty {
+  text-align: center; padding: 64px 20px;
+  background: #ffffff; border: 1px solid #e4e4e7;
+  border-radius: 12px; color: #a1a1aa;
+}
+.devices-empty svg { margin-bottom: 16px; color: #d4d4d8; }
+.devices-empty h3 { font-size: 1rem; font-weight: 600; color: #52525b; margin-bottom: 6px; }
+.devices-empty p  { font-size: 0.875rem; color: #a1a1aa; }
+
+/* Loading / error */
+.devices-loading,
+.devices-error { padding: 60px; text-align: center; color: #71717a; font-size: 0.9rem; }
+.devices-error { color: #dc2626; }
+
+/* ── Register Modal ───────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 100%; max-width: 480px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+}
+.modal-box h2 { font-size: 1.15rem; font-weight: 700; color: #18181b; margin-bottom: 22px; }
+
+.modal-field { margin-bottom: 16px; }
+.modal-field label {
+  display: block; font-size: 0.72rem; font-weight: 600;
+  color: #71717a; margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.modal-field input,
+.modal-field select {
+  width: 100%; padding: 10px 12px;
+  border: 1px solid #e4e4e7; border-radius: 8px;
+  font-size: 0.9rem; color: #18181b;
+  background: #fff; transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.modal-field input::placeholder { color: #a1a1aa; }
+.modal-field input:focus,
+.modal-field select:focus {
+  outline: none; border-color: #18181b;
+  box-shadow: 0 0 0 3px rgba(24,24,27,0.08);
+}
+.modal-field select option { background: #fff; color: #18181b; }
+
+.modal-actions { display: flex; gap: 10px; margin-top: 22px; }
+
+.btn-cancel {
+  flex: 1; padding: 10px;
+  background: #fff; color: #52525b;
+  border: 1px solid #e4e4e7; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 500;
+  cursor: pointer; transition: all 0.18s;
+}
+.btn-cancel:hover { background: #f4f4f5; color: #18181b; border-color: #a1a1aa; }
+
+.btn-register-submit {
+  flex: 1; padding: 10px;
+  background: #18181b; color: #fff;
+  border: none; border-radius: 8px;
+  font-size: 0.875rem; font-weight: 600;
+  cursor: pointer; transition: background 0.18s;
+}
+.btn-register-submit:hover:not(:disabled) { background: #09090b; }
+.btn-register-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Alerts in modal */
+.modal-alert {
+  padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 14px;
+}
+.modal-alert.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+/* Delete button on card */
+.btn-delete {
+  padding: 5px 10px; background: none; color: #dc2626;
+  border: 1px solid #fecaca; border-radius: 6px;
+  font-size: 0.75rem; cursor: pointer; transition: all 0.18s;
+}
+.btn-delete:hover { background: #fef2f2; }
+
+@media (max-width: 768px) {
+  .devices-page { padding: 16px; }
+  .devices-grid { grid-template-columns: 1fr; }
+  .modal-box { margin: 16px; }
+}

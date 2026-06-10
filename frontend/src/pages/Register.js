@@ -93,7 +93,7 @@ function Register() {
             </svg>
           </div>
           <h1>Create Account</h1>
-          <p>Join the LoRaWAN data platform</p>
+          <p>Join the FillXpert field monitoring platform</p>
         </div>
 
         {error && (
@@ -291,7 +291,7 @@ function Register() {
       <div className="register-info">
         <div className="info-content">
           <h2>Start Monitoring Your IoT Network</h2>
-          <p>Get started with our comprehensive platform for LoRaWAN sensor data collection and management.</p>
+          <p>Get started with FillXpert — a comprehensive platform for IoT sensor data collection and field monitoring.</p>
           
           <div className="benefits-list">
             <div className="benefit-item">

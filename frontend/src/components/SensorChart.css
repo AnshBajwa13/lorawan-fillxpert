@@ -1,0 +1,158 @@
+/* ── SensorChart — Light Theme ───────────────────────────────── */
+
+.chart-panel {
+  background: #fff;
+  border: 1px solid #e4e4e7;
+  border-radius: 10px;
+  padding: 20px 24px 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chart-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #18181b;
+  margin: 0;
+}
+
+.chart-subtitle {
+  font-size: 0.75rem;
+  color: #71717a;
+  margin: 2px 0 0 0;
+}
+
+/* Metric toggle pills */
+.chart-toggles {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chart-toggle {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #f4f4f5;
+  color: #52525b;
+}
+
+.chart-toggle:hover {
+  background: #18181b;
+  color: #fff;
+}
+
+.chart-toggle.active-moisture   { background: #18181b; color: #fff; border-color: #18181b; }
+.chart-toggle.active-temperature{ background: #dc2626; color: #fff; border-color: #dc2626; }
+.chart-toggle.active-humidity   { background: #2563eb; color: #fff; border-color: #2563eb; }
+.chart-toggle.active-battery    { background: #16a34a; color: #fff; border-color: #16a34a; }
+
+/* Recharts container */
+.chart-container {
+  width: 100%;
+}
+
+/* Empty / insufficient data state */
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  color: #a1a1aa;
+  font-size: 0.85rem;
+  gap: 8px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px dashed #e4e4e7;
+}
+
+.chart-empty-icon {
+  font-size: 2rem;
+  opacity: 0.4;
+}
+
+/* Custom tooltip */
+.chart-tooltip {
+  background: #18181b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+
+.chart-tooltip-label {
+  font-size: 0.72rem;
+  color: #a1a1aa;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.chart-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Legend */
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  justify-content: center;
+}
+
+.chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: #52525b;
+}
+
+.chart-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Device selector inside chart */
+.chart-device-info {
+  font-size: 0.72rem;
+  background: #f4f4f5;
+  padding: 3px 10px;
+  border-radius: 6px;
+  color: #52525b;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .chart-panel { padding: 14px 12px; }
+  .chart-header { gap: 8px; }
+  .chart-toggles { gap: 4px; }
+  .chart-toggle { padding: 3px 8px; font-size: 0.72rem; }
+}

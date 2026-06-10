@@ -14,3 +14,5 @@ python-multipart==0.0.6
 email-validator==2.1.0
 slowapi==0.1.9
 pymysql==1.1.0
+aiomqtt==2.3.0
+websockets>=13.0      # used by test_mqtt_integration.py WebSocket client test

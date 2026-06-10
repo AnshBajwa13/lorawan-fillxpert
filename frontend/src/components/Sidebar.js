@@ -28,6 +28,20 @@ function Sidebar({ isOpen, onClose, currentUser }) {
       path: '/',
       description: 'View all data'
     },
+    {
+      id: 'devices',
+      label: 'Devices',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="2" y="7" width="20" height="14" rx="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" strokeLinecap="round" strokeLinejoin="round"/>
+          <line x1="12" y1="12" x2="12" y2="16" strokeLinecap="round"/>
+          <line x1="10" y1="14" x2="14" y2="14" strokeLinecap="round"/>
+        </svg>
+      ),
+      path: '/devices',
+      description: 'Manage transmitters'
+    },
     { 
       id: 'manual-entry', 
       label: 'Manual Entry', 
@@ -64,6 +78,7 @@ function Sidebar({ isOpen, onClose, currentUser }) {
     },
   ];
 
+
   return (
     <>
       {/* Overlay for mobile */}
@@ -78,7 +93,7 @@ function Sidebar({ isOpen, onClose, currentUser }) {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            {isOpen && <span className="logo-text">LoRaWAN System</span>}
+            {isOpen && <span className="logo-text">FillXpert</span>}
           </div>
           {isOpen && (
             <button className="sidebar-close" onClick={onClose}>
@@ -130,7 +145,7 @@ function Sidebar({ isOpen, onClose, currentUser }) {
             {isOpen && (
               <div className="user-info">
                 <div className="user-name">{currentUser?.full_name || currentUser?.username || 'Admin User'}</div>
-                <div className="user-email">{currentUser?.email || 'admin@fillxpert.com'}</div>
+                <div className="user-email">{currentUser?.email || 'admin@fillxpert.io'}</div>
               </div>
             )}
           </div>

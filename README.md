@@ -314,3 +314,16 @@ For issues or questions, please check:
 curl http://localhost:8000/
 curl http://localhost:8000/api/stats
 ```
+
+
+sangrur1/senasor1config {freq:2 time:10AM,2PM sensor:moisture}
+config topic i publish then sensir will parse it , like dashboard act as publidher,C:\Users\Anshd>mosquitto_sub -h 140.245.7.35 -t , 
+sangrur1/senasor1config 021000140001
+see how it can parse its like first tume u set and default it is each sensor each sim gsm , rtc current time pull sync 10am reading takrn mqtt send mqtt server recieve  now 15-20s server give to see ay change in config ,if change then send to it otherwise ed like 00 go back to sleep after timeout , and what we thin ksimsensor enclosure is transmitter in enclsure attach to sensor and we change the sensor 
+
+
+telematry topic  
+how handshake so that no  loss if suppose 10 am not data send 
+bytton press 10 sec it send data it 
+
+freq time two things we can say we have in config which we will share , now when tehy require next config from us when they change sensor attach to the trasnmitter which we make as structure consist 

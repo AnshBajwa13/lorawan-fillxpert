@@ -79,16 +79,34 @@
   letter-spacing: 0.025em;
 }
 
-.badge.gateway {
+.badge.location {
   background-color: #18181b;
   color: #ffffff;
   font-weight: 600;
 }
 
-.badge.node {
-  background-color: #71717a;
+.badge.device {
+  background-color: #3f3f46;
   color: #ffffff;
   font-weight: 600;
+}
+
+/* Legacy aliases (keep for compat) */
+.badge.gateway { background-color: #18181b; color: #fff; font-weight: 600; }
+.badge.node    { background-color: #71717a; color: #fff; font-weight: 600; }
+
+.badge.calibration {
+  background-color: #fef9c3;
+  color: #a16207;
+  border: 1px solid #fde68a;
+}
+
+.badge.trigger {
+  background-color: #f4f4f5;
+  color: #71717a;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .battery {
@@ -207,6 +225,28 @@
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 1rem;
+}
+
+/* Live row from WebSocket */
+.row-live {
+  background-color: #f0fdf4;
+  animation: rowFlash 1.2s ease-out;
+}
+@keyframes rowFlash {
+  0%   { background-color: #dcfce7; }
+  100% { background-color: #f0fdf4; }
+}
+
+.live-dot {
+  display: inline-block;
+  color: #22c55e;
+  font-size: 8px;
+  margin-left: 4px;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
 }
 
 @keyframes spin {

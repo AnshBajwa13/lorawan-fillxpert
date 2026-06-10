@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Database Setup Script for LoRaWAN System on Production MySQL
+FillXpert — Database Setup Script for Production Server
 Run this on the fillxpert.com server after uploading code
 """
 import sys
@@ -216,7 +216,7 @@ def show_gateway_example():
 
 if __name__ == "__main__":
     print("="*60)
-    print("🚀 LoRaWAN Database Setup - Production")
+    print("FillXpert Database Setup - Production")
     print("="*60)
     
     show_database_info()

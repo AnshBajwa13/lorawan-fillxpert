@@ -1,15 +1,20 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, Request, Header
+from fastapi import FastAPI, Depends, HTTPException, Query, Request, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 from typing import List, Optional
 from datetime import datetime, timedelta
+import asyncio
+import logging
 
 from database import get_db, init_db
 from models import SensorReading
+import models_device  # noqa: F401 — registers Device + DeviceConfig tables with Base.metadata
 from schemas import SensorDataInput, SensorDataResponse, SensorReadingOutput
 from auth import get_current_user, get_current_user_optional
 from models_auth import User, APIKey
+from config import get_settings
 
 # Try to import Celery tasks, fallback to direct save if not available
 try:
@@ -20,53 +25,101 @@ except Exception as e:
     print(f"  Celery not available: {e}")
     print("   Using direct database saves (no background processing)")
     CELERY_AVAILABLE = False
-    save_sensor_data = None  # Set to None to avoid NameError
+    save_sensor_data = None
 
-# Import authentication router
+# Import routers
 from routers.auth import router as auth_router
+from routers.devices import router as devices_router
+
+# Import MQTT handler and WebSocket manager
+import mqtt_handler
+from websocket_manager import ws_manager
 
 # Import rate limiter
 from rate_limiter import limiter, rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded  # type: ignore
 
+logger = logging.getLogger("app")
+settings = get_settings()
+
+# ---------------------------------------------------------------------------
+# Lifespan — startup/shutdown (replaces deprecated @app.on_event)
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ── Startup ──
+    init_db()  # Create tables (skips existing ones)
+    print(" Database initialized successfully")
+
+    # Start MQTT background task
+    mqtt_task = asyncio.create_task(mqtt_handler.run(settings))
+    print(f" MQTT handler started → {settings.MQTT_BROKER_HOST}:{settings.MQTT_BROKER_PORT}")
+
+    yield
+
+    # ── Shutdown ──
+    mqtt_task.cancel()
+    try:
+        await asyncio.gather(mqtt_task, return_exceptions=True)
+    except Exception:
+        pass
+    print(" MQTT handler stopped.")
+
+
+# ---------------------------------------------------------------------------
 # Initialize FastAPI app
+# ---------------------------------------------------------------------------
 app = FastAPI(
-    title="LoRaWAN Data Collection API",
-    description="Production-ready API for collecting and managing LoRaWAN sensor data with authentication",
-    version="2.0.0"
+    title="IoT Soil Monitoring API",
+    description="Collects sensor telemetry via MQTT and HTTP. Manages device configs.",
+    version="2.1.0",
+    lifespan=lifespan,
 )
 
-# Add rate limiter state
+# Rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
-# CORS configuration - allow frontend to access API
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include authentication routes
+# Routers
 app.include_router(auth_router)
+app.include_router(devices_router)
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    init_db()
-    print(" Database initialized successfully")
+# ---------------------------------------------------------------------------
+# WebSocket — real-time push to dashboard browsers
+# ---------------------------------------------------------------------------
+@app.websocket("/ws/realtime")
+async def websocket_realtime(websocket: WebSocket):
+    """
+    Dashboard connects here to receive live events:
+      - new_reading   : new sensor telemetry arrived via MQTT
+      - device_status : device came online or went offline
+      - config_acked  : device confirmed it applied new config
+    """
+    await ws_manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()   # keep-alive; client can send pings
+    except (WebSocketDisconnect, Exception):
+        ws_manager.disconnect(websocket)
 
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Health check — returns service name and version"""
     return {
         "status": "online",
-        "service": "LoRaWAN Data Collection API",
-        "version": "1.0.0"
+        "service": "FillXpert Data Collection API",
+        "version": "2.1.0"
     }
 
 
@@ -230,7 +283,7 @@ async def get_gateways(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get list of all unique gateway IDs for current user"""
+    """Get list of all unique location identifiers (gateway_id column) for current user"""
     gateways = db.query(SensorReading.gateway_id)\
         .filter(SensorReading.user_id == current_user.id)\
         .distinct().all()
@@ -239,11 +292,11 @@ async def get_gateways(
 
 @app.get("/api/nodes", response_model=List[str])
 async def get_nodes(
-    gateway_id: Optional[str] = Query(None, description="Filter nodes by gateway"),
+    gateway_id: Optional[str] = Query(None, description="Filter by location (gateway_id)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get list of all unique node IDs for current user, optionally filtered by gateway"""
+    """Get list of all unique device IDs (node_id column) for current user, optionally filtered by location"""
     query = db.query(SensorReading.node_id)\
         .filter(SensorReading.user_id == current_user.id)\
         .distinct()

@@ -1,33 +1,31 @@
 import React from 'react';
 import DataTable from '../components/DataTable';
 import Stats from '../components/Stats';
+import SensorChart from '../components/SensorChart';
 
-function Dashboard({ 
-  data, 
-  filteredData, 
-  gateways, 
-  nodes, 
-  selectedGateway, 
-  setSelectedGateway, 
-  selectedNode, 
-  setSelectedNode, 
-  searchTerm, 
-  setSearchTerm, 
-  timeRange, 
-  setTimeRange, 
-  loading, 
-  error, 
-  setError, 
-  stats, 
-  autoRefresh, 
-  setAutoRefresh, 
-  apiStatus, 
-  lastUpdate, 
-  isRefreshing, 
-  fetchData, 
-  resetFilters, 
-  exportToCSV, 
-  historicalData 
+function Dashboard({
+  data,
+  filteredData,
+  locations,
+  deviceIds,
+  selectedLocation,
+  setSelectedLocation,
+  selectedDevice,
+  setSelectedDevice,
+  searchTerm,
+  setSearchTerm,
+  timeRange,
+  setTimeRange,
+  loading,
+  error,
+  setError,
+  stats,
+  mqttStatus,
+  isRefreshing,
+  fetchData,
+  resetFilters,
+  exportToCSV,
+  historicalData
 }) {
   return (
     <>
@@ -42,9 +40,10 @@ function Dashboard({
 
       <div className="controls-panel">
         <div className="controls-row">
+
           <div className="control-group">
             <label>Time Range</label>
-            <select value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
+            <select value={timeRange} onChange={e => setTimeRange(e.target.value)}>
               <option value="1">Last 1 Hour</option>
               <option value="6">Last 6 Hours</option>
               <option value="24">Last 24 Hours</option>
@@ -54,32 +53,25 @@ function Dashboard({
           </div>
 
           <div className="control-group">
-            <label>Gateway</label>
-            <select 
-              value={selectedGateway} 
-              onChange={(e) => {
-                setSelectedGateway(e.target.value);
-                setSelectedNode('');
-              }}
+            <label>Location</label>
+            <select
+              value={selectedLocation}
+              onChange={e => { setSelectedLocation(e.target.value); setSelectedDevice(''); }}
             >
-              <option value="">All Gateways</option>
-              {gateways.map(gw => (
-                <option key={gw} value={gw}>{gw}</option>
-              ))}
+              <option value="">All Locations</option>
+              {locations.map(loc => <option key={loc} value={loc}>{loc}</option>)}
             </select>
           </div>
 
           <div className="control-group">
-            <label>Node</label>
-            <select 
-              value={selectedNode} 
-              onChange={(e) => setSelectedNode(e.target.value)}
-              disabled={!selectedGateway && nodes.length === 0}
+            <label>Device</label>
+            <select
+              value={selectedDevice}
+              onChange={e => setSelectedDevice(e.target.value)}
+              disabled={deviceIds.length === 0}
             >
-              <option value="">All Nodes</option>
-              {nodes.map(node => (
-                <option key={node} value={node}>{node}</option>
-              ))}
+              <option value="">All Devices</option>
+              {deviceIds.map(id => <option key={id} value={id}>{id}</option>)}
             </select>
           </div>
 
@@ -87,9 +79,9 @@ function Dashboard({
             <label>Search</label>
             <input
               type="text"
-              placeholder="Filter by gateway or node..."
+              placeholder="Filter by location or device ID..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="search-input"
             />
           </div>
@@ -109,20 +101,31 @@ function Dashboard({
           </div>
 
           <div className="control-toggles">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-              />
-              <span>Auto-refresh (10s)</span>
-            </label>
+            {/* Live MQTT indicator — replaces the old auto-refresh checkbox */}
+            <span style={{
+              fontSize: '0.8rem',
+              padding: '4px 12px',
+              borderRadius: '999px',
+              background: mqttStatus === 'connected' ? '#f0fdf4' : '#fafafa',
+              border: `1px solid ${mqttStatus === 'connected' ? '#bbf7d0' : '#e4e4e7'}`,
+              color: mqttStatus === 'connected' ? '#15803d' : '#a1a1aa',
+              fontWeight: 500,
+            }}>
+              {mqttStatus === 'connected' ? '● Live (MQTT active)' : '○ Live (reconnecting...)'}
+            </span>
           </div>
         </div>
       </div>
 
-      <DataTable 
-        data={filteredData} 
+      {/* Sensor Trend Chart — reads filteredData, no API call, renders above table */}
+      <SensorChart
+        filteredData={filteredData}
+        selectedDevice={selectedDevice}
+        selectedLocation={selectedLocation}
+      />
+
+      <DataTable
+        data={filteredData}
         loading={loading}
         totalCount={data.length}
         filteredCount={filteredData.length}

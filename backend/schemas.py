@@ -4,14 +4,14 @@ from typing import Optional, Dict, Any
 
 
 class SensorDataInput(BaseModel):
-    """Schema for incoming sensor data from gateway"""
-    gateway_id: str = Field(..., description="Gateway identifier")
-    node_id: str = Field(..., description="Node/Sensor identifier")
+    """Schema for manual sensor data entry (admin use only — devices post via MQTT)"""
+    gateway_id: str = Field(..., description="Location/area identifier (maps to MQTT topic prefix)")
+    node_id: str = Field(..., description="Device ID (transmitter firmware ID, e.g. SNR001)")
     timestamp: datetime = Field(..., description="Timestamp of the reading")
     
     # Standard fixed measurements (backward compatible)
     humidity: Optional[float] = Field(None, ge=0, le=100, description="Humidity percentage")
-    moisture: Optional[float] = Field(None, ge=0, le=100, description="Moisture percentage")
+    moisture: Optional[float] = Field(None, ge=0, le=100, description="Soil moisture percentage")
     temperature: Optional[float] = Field(None, description="Temperature in Celsius")
     battery_voltage: Optional[float] = Field(None, ge=0, le=5, description="Battery voltage (0-5V)")
     
@@ -21,9 +21,9 @@ class SensorDataInput(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "gateway_id": "GW-1",
-                "node_id": "NODE-1",
-                "timestamp": "2026-01-07T23:15:00Z",
+                "gateway_id": "chandigarh",
+                "node_id": "SNR001",
+                "timestamp": "2026-06-10T10:00:00Z",
                 "humidity": 65.5,
                 "moisture": 42.3,
                 "temperature": 25.8,

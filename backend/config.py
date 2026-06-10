@@ -28,7 +28,15 @@ class Settings(BaseSettings):
     # Email (optional)
     FROM_EMAIL: Optional[str] = None
     SENDGRID_API_KEY: Optional[str] = None
-    
+
+    # MQTT Broker (Mosquitto on Oracle server)
+    MQTT_BROKER_HOST: str = "140.245.7.35"
+    MQTT_BROKER_PORT: int = 1883
+    MQTT_USERNAME: Optional[str] = None   # set in .env if Mosquitto auth enabled
+    MQTT_PASSWORD: Optional[str] = None   # set in .env if Mosquitto auth enabled
+    MQTT_CLIENT_ID: str = "iot-dashboard-backend"
+    MQTT_RECONNECT_INTERVAL: int = 5      # seconds between reconnect attempts
+
     class Config:
         env_file = ".env"
         extra = "ignore"  # Ignore extra fields in .env
