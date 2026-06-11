@@ -10,21 +10,6 @@ function Settings() {
         <p>System configuration and integration reference</p>
       </div>
 
-      {/* ── MQTT Topic Structure ─────────────────────────────────────────── */}
-      <div className="settings-section">
-        <h3>MQTT Topic Structure</h3>
-        <div style={{ background:'#18181b', borderRadius:8, padding:'14px 18px' }}>
-          <div style={{ fontSize:'0.7rem', fontWeight:600, color:'#a1a1aa', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.05em' }}>
-            Topic Structure (agreed with firmware)
-          </div>
-          <code style={{ color:'#22c55e', fontSize:'0.82rem', fontFamily:'monospace', lineHeight:2.2, display:'block' }}>
-            {'{'}<span style={{color:'#fbbf24'}}>location</span>{'}'}/{'{'}<span style={{color:'#60a5fa'}}>device_id</span>{'}'}/telemetry    → sensor readings (device → server)<br/>
-            {'{'}<span style={{color:'#fbbf24'}}>location</span>{'}'}/{'{'}<span style={{color:'#60a5fa'}}>device_id</span>{'}'}/config        → config push (server → device, retained)<br/>
-            {'{'}<span style={{color:'#fbbf24'}}>location</span>{'}'}/{'{'}<span style={{color:'#60a5fa'}}>device_id</span>{'}'}/config/ack   → device confirms config applied<br/>
-            {'{'}<span style={{color:'#fbbf24'}}>location</span>{'}'}/{'{'}<span style={{color:'#60a5fa'}}>device_id</span>{'}'}/status       → online/offline (LWT)
-          </code>
-        </div>
-      </div>
 
       {/* ── Config Frequency Info ───────────────────────────────────────── */}
       <div className="settings-section">
