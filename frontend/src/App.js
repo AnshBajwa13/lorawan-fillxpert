@@ -159,7 +159,7 @@ function App() {
         const msg = JSON.parse(evt.data);
 
         if (msg.event === 'new_reading') {
-          const { device_id, location, timestamp, readings: vals, battery_mv, rssi_dbm } = msg;
+          const { device_id, location, timestamp, readings: vals, battery_mv } = msg;
 
           // Build a pseudo-reading row matching the REST API shape
           const newReading = {

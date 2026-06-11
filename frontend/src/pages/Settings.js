@@ -1,84 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import './Settings.css';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-
 function Settings() {
-  const [apiKeys,           setApiKeys]           = useState([]);
-  const [keysLoading,       setKeysLoading]       = useState(true);
-  const [error,             setError]             = useState(null);
-  const [showCreateModal,   setShowCreateModal]   = useState(false);
-  const [newKeyName,        setNewKeyName]        = useState('');
-  const [newKeyExpiration,  setNewKeyExpiration]  = useState('never');
-  const [createdKey,        setCreatedKey]        = useState(null);
-  const [copied,            setCopied]            = useState(false);
-
-  const getToken = () => localStorage.getItem('access_token');
-
-  // ── Fetch API keys ────────────────────────────────────────────────────
-  const fetchApiKeys = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/auth/api-keys`, {
-        headers: { Authorization: `Bearer ${getToken()}` }
-      });
-      if (!res.ok) throw new Error('Failed to fetch API keys');
-      const data = await res.json();
-      setApiKeys(data.keys || []);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setKeysLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchApiKeys(); }, [fetchApiKeys]);
-
-  const createApiKey = async () => {
-    if (!newKeyName.trim()) return;
-    try {
-      const res = await fetch(`${API_URL}/api/auth/api-keys`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key_name: newKeyName, expiration: newKeyExpiration }),
-      });
-      if (!res.ok) throw new Error('Failed to create API key');
-      const data = await res.json();
-      setCreatedKey(data);
-      setNewKeyName('');
-      fetchApiKeys();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const copyToClipboard = async (text) => {
-    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    catch {}
-  };
-
-  const toggleApiKey = async (keyId, isActive) => {
-    try {
-      await fetch(`${API_URL}/api/auth/api-keys/${keyId}`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: !isActive }),
-      });
-      fetchApiKeys();
-    } catch (err) { setError(err.message); }
-  };
-
-  const deleteApiKey = async (keyId) => {
-    if (!window.confirm('Delete this API key?')) return;
-    try {
-      await fetch(`${API_URL}/api/auth/api-keys/${keyId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      fetchApiKeys();
-    } catch (err) { setError(err.message); }
-  };
-
   // ─────────────────────────────────────────────────────────────────────
   return (
     <div className="settings-page">
@@ -143,51 +66,6 @@ function Settings() {
         </div>
       </div>
 
-      {/* ── Create key modal ────────────────────────────────────────────── */}
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            {!createdKey ? (
-              <>
-                <h3>Create API Key</h3>
-                <div className="form-group">
-                  <label>Key Name</label>
-                  <input value={newKeyName} onChange={e => setNewKeyName(e.target.value)} placeholder="e.g., Integration Key" />
-                </div>
-                <div className="form-group">
-                  <label>Expiration</label>
-                  <select value={newKeyExpiration} onChange={e => setNewKeyExpiration(e.target.value)}>
-                    <option value="never">Never</option>
-                    <option value="30d">30 Days</option>
-                    <option value="90d">90 Days</option>
-                    <option value="1y">1 Year</option>
-                  </select>
-                </div>
-                <div className="modal-actions">
-                  <button className="cancel-btn" onClick={() => setShowCreateModal(false)}>Cancel</button>
-                  <button className="create-btn" onClick={createApiKey} disabled={!newKeyName.trim()}>Create</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <h3>API Key Created</h3>
-                <div className="warning-box">Copy this key now — it will not be shown again.</div>
-                <div className="key-display">
-                  <code>{createdKey.api_key}</code>
-                  <button className="copy-btn" onClick={() => copyToClipboard(createdKey.api_key)}>
-                    {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                </div>
-                <div className="modal-actions">
-                  <button className="done-btn" onClick={() => { setShowCreateModal(false); setCreatedKey(null); }}>
-                    Done
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
