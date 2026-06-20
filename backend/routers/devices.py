@@ -156,15 +156,16 @@ async def push_config(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=str(e))
 
-    # Build dynamic payload: [sensor:2][freq:2][timeN:4 × freq]
+    # Increment config version FIRST — needed inside the payload
+    new_version = (device.cfg_version or 0) + 1
+
+    # Build dynamic payload: [sensor:2][freq:2][timeN:4 × freq][cfg_ver:2]
     payload_str = build_config_payload(
         sensor_type=body.sensor_type,
         freq=body.freq,
         times=[(t1h, t1m), (t2h, t2m), (t3h, t3m), (t4h, t4m)],
+        cfg_ver=new_version,
     )
-
-    # Increment config version
-    new_version = (device.cfg_version or 0) + 1
 
     # Publish to MQTT with retain=True
     # Topic: {location}/{device_id}/config

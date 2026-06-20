@@ -112,10 +112,10 @@ class DeviceConfig(Base):
     time2_min   = Column(Integer, nullable=True,  default=0)
 
     # Compact payload string sent to device via MQTT (dynamic length)
-    # 8 chars (1×), 12 chars (2×), 16 chars (3×), 20 chars (4×)
-    # Format: [sensor:2][freq:2][time1:4][time2:4?][time3:4?][time4:4?]
-    # e.g. "010210001400"  → moisture, 2×/day, 10:00 + 14:00
-    payload_str = Column(String(20), nullable=False)
+    # 10 chars (1×), 14 chars (2×), 18 chars (3×), 22 chars (4×)
+    # Format: [sensor:2][freq:2][timeN:4×freq][cfg_ver:2]
+    # e.g. "010210001400"  → old format, now "0102100014000" + ver
+    payload_str = Column(String(22), nullable=False)
 
     # Delivery tracking
     published_at  = Column(DateTime, server_default=func.now())
@@ -177,26 +177,28 @@ def _rssi_label(rssi: int | None) -> str:
 
 
 def build_config_payload(sensor_type: str, freq: int,
-                          times: list[tuple[int | None, int | None]]) -> str:
+                          times: list[tuple[int | None, int | None]],
+                          cfg_ver: int = 0) -> str:
     """
     Build dynamic config string for device firmware.
 
-    New format: [sensor_code:2][freq:2][timeN:4 × freq]
+    Format: [sensor_code:2][freq:2][timeN:4 × freq][cfg_ver:2]
     Each time slot is HHMM (4 chars). Only `freq` slots are appended.
+    cfg_ver allows firmware to extract and echo back the version in ACK.
 
     Examples:
-      freq=1  → "01011000"            (8 chars)
-      freq=2  → "010210001400"         (12 chars)
-      freq=3  → "0103100014000800"     (16 chars)
-      freq=4  → "01041000140008001600" (20 chars)
+      freq=1, v1  → "0101100001"              (10 chars)
+      freq=2, v2  → "01021000140002"           (14 chars)
+      freq=3, v6  → "010310001400080006"       (18 chars)
+      freq=4, v7  → "0104100014000800160007"   (22 chars)
     """
     code = SENSOR_NAME_TO_CODE.get(sensor_type, "01")
     parts = [code, f"{freq:02d}"]
     for i in range(freq):
         h, m = times[i] if i < len(times) else (None, None)
         if h is None or m is None:
-            # Fallback: if time not provided, use 00:00
-            parts.append("0000")
+            parts.append("0000")   # fallback: 00:00 if slot missing
         else:
             parts.append(f"{h:02d}{m:02d}")
+    parts.append(f"{cfg_ver:02d}")  # always last 2 chars — version stamp
     return "".join(parts)

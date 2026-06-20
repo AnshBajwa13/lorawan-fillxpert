@@ -68,17 +68,18 @@ export default function DeviceConfig() {
     load();
   }, [deviceId]); // eslint-disable-line
 
-  // ── Payload preview — new format: [sensor:2][freq:2][timeN:4×freq] ──
+  // ── Payload preview — format: [sensor:2][freq:2][timeN:4×freq][ver:2] ──
   const buildPayloadPreview = () => {
     const codes = { moisture:'01', temperature:'02', npk:'03', ph:'04', ultrasonic:'05', humidity:'06' };
-    const code  = codes[sensorType] || '01';
-    const freqStr = String(freq).padStart(2, '0');
+    const code     = codes[sensorType] || '01';
+    const freqStr  = String(freq).padStart(2, '0');
+    const nextVer  = String((device?.cfg_version || 0) + 1).padStart(2, '0');
     let slots = '';
     for (let i = 0; i < freq; i++) {
       const [h, m] = times[i].split(':');
       slots += h.padStart(2,'0') + m.padStart(2,'0');
     }
-    return `${code}${freqStr}${slots}`;
+    return `${code}${freqStr}${slots}${nextVer}`;
   };
 
   const updateTime = (idx, value) => {
@@ -220,7 +221,9 @@ export default function DeviceConfig() {
 
             {/* Payload preview */}
             <div className="payload-preview">
-              <span className="payload-label">Firmware payload string (12-char compact)</span>
+              <span className="payload-label">
+                Firmware Payload String ({2 + 2 + (freq * 4) + 2}-char · dynamic)
+              </span>
               <div className="payload-grid">
                 <div className="payload-box">
                   <span className="payload-value">{payloadPreview}</span>
@@ -230,10 +233,11 @@ export default function DeviceConfig() {
                   <span>Topic: <code>{device.location}/{deviceId}/config</code></span>
                   <span>Retained: yes · QoS: 1</span>
                   <span>Sensor code: {payloadPreview.slice(0,2)}</span>
+                  <span>Freq: {payloadPreview.slice(2,4)} ({freq}×/day)</span>
                   {[...Array(freq)].map((_, i) => (
                     <span key={i}>Slot {i+1}: {times[i]}</span>
                   ))}
-                  <span>Freq: {freq}×/day</span>
+                  <span>Version: v{(device?.cfg_version || 0) + 1} → last 2 chars = {payloadPreview.slice(-2)}</span>
                 </div>
               </div>
             </div>
