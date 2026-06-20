@@ -172,6 +172,7 @@ function App() {
             temperature: vals?.temperature ?? null,
             battery_voltage: battery_mv ? battery_mv / 1000 : null,
             measurements: vals,
+            trigger: msg.trigger || 'schedule', // Fix: correctly pass trigger from WS payload
             _live: true,              // flag for optional "LIVE" badge in table
             _calibration: msg.trigger === 'manual', // calibration mode reading
           };

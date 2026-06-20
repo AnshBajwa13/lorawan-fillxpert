@@ -362,7 +362,7 @@ async def _dispatch(topic_parts: list[str], payload_str: str):
             "device_id":  data["device_id"],
             "location":   data["location"],
             "sensor_type":data["sensor_type"],
-            "timestamp":  data["timestamp"].isoformat(),
+            "timestamp":  data["timestamp"].isoformat() + "Z",
             "readings":   {**data["standard"], **data["extra"]},
             "battery_mv": data.get("battery_mv"),
             "battery_pct":_mv_to_pct(data.get("battery_mv")),
