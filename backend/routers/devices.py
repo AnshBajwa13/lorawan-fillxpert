@@ -147,7 +147,7 @@ async def push_config(
     # Parse times
     try:
         t1h, t1m = _parse_time(body.time1)
-        t2h, t2m = (_parse_time(body.time2) if body.time2 and body.freq == 2
+        t2h, t2m = (_parse_time(body.time2) if body.time2 and body.freq >= 2
                     else (None, None))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
