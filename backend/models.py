@@ -41,12 +41,16 @@ class SensorReading(Base):
 
     def to_dict(self):
         """Convert model to dictionary"""
+        def utc(dt):
+            """Return ISO string with Z so JS treats it as UTC, not local time."""
+            return dt.isoformat() + "Z" if dt else None
+
         result = {
             "id": self.id,
             "user_id": self.user_id,
             "gateway_id": self.gateway_id,
             "node_id": self.node_id,
-            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "timestamp": utc(self.timestamp),
             "humidity": self.humidity,
             "moisture": self.moisture,
             "temperature": self.temperature,
@@ -56,7 +60,7 @@ class SensorReading(Base):
             "rssi_dbm": self.rssi_dbm,   # signal strength dBm
             "cfg_ver":  self.cfg_ver,    # config version device was running
             "msg_id":   self.msg_id,     # dedup key
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": utc(self.created_at),
         }
 
         # Add dynamic measurements if present
