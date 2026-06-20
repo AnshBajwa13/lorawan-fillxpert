@@ -77,7 +77,7 @@ function Login() {
             </svg>
           </div>
           <h1>Welcome Back</h1>
-          <p>Sign in to your FillXpert account</p>
+          <p>Sign in to your account</p>
         </div>
 
         {error && (
@@ -174,7 +174,7 @@ function Login() {
 
       <div className="login-info">
         <div className="info-content">
-          <h2>FillXpert</h2>
+          <h2>SensorVault</h2>
           <p>Monitor and manage your IoT sensor network with real-time data visualization and analytics.</p>
           <div className="features-list">
             <div className="feature-item">

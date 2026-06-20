@@ -13,39 +13,39 @@ import Devices from './pages/Devices';
 import DeviceConfig from './pages/DeviceConfig';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
-const WS_URL  = (API_URL.replace('http', 'ws')) + '/ws/realtime';
+const WS_URL = (API_URL.replace('http', 'ws')) + '/ws/realtime';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser,     setCurrentUser]     = useState(null);
-  const [authLoading,     setAuthLoading]     = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Sensor data
-  const [data,         setData]         = useState([]);
+  const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
 
   // Filters — renamed from gateway/node → location/device
-  const [locations,        setLocations]        = useState([]);
-  const [deviceIds,        setDeviceIds]        = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [deviceIds, setDeviceIds] = useState([]);
   const [selectedLocation, setSelectedLocation] = useState('');
-  const [selectedDevice,   setSelectedDevice]   = useState('');
-  const [searchTerm,       setSearchTerm]       = useState('');
-  const [timeRange,        setTimeRange]        = useState('24');
+  const [selectedDevice, setSelectedDevice] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [timeRange, setTimeRange] = useState('24');
 
   // UI state
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState(null);
-  const [stats,         setStats]         = useState(null);
-  const [apiStatus,     setApiStatus]     = useState('checking');
-  const [mqttStatus,    setMqttStatus]    = useState('disconnected'); // WebSocket = MQTT bridge
-  const [lastUpdate,    setLastUpdate]    = useState(null);
-  const [isRefreshing,  setIsRefreshing]  = useState(false);
-  const [sidebarOpen,   setSidebarOpen]   = useState(true);
-  const [historicalData,setHistoricalData]= useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [apiStatus, setApiStatus] = useState('checking');
+  const [mqttStatus, setMqttStatus] = useState('disconnected'); // WebSocket = MQTT bridge
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [historicalData, setHistoricalData] = useState({});
 
   // WebSocket ref
-  const wsRef     = useRef(null);
-  const wsRetryRef= useRef(null);
+  const wsRef = useRef(null);
+  const wsRetryRef = useRef(null);
 
   // ── Axios interceptor (auth token) ────────────────────────────────────
   useEffect(() => {
@@ -91,9 +91,9 @@ function App() {
         history[key] = { humidity: [], moisture: [], temperature: [], battery_voltage: [] };
       }
       const push = (arr, val) => { if (val != null) { arr.push(val); if (arr.length > 10) arr.shift(); } };
-      push(history[key].humidity,        r.humidity);
-      push(history[key].moisture,        r.moisture);
-      push(history[key].temperature,     r.temperature);
+      push(history[key].humidity, r.humidity);
+      push(history[key].moisture, r.moisture);
+      push(history[key].temperature, r.temperature);
       push(history[key].battery_voltage, r.battery_voltage);
     });
     return history;
@@ -163,17 +163,17 @@ function App() {
 
           // Build a pseudo-reading row matching the REST API shape
           const newReading = {
-            id:              Date.now(),        // temp id for key
-            gateway_id:      location,          // location = gateway_id in DB
-            node_id:         device_id,
-            timestamp:       timestamp,
-            humidity:        vals?.humidity    ?? null,
-            moisture:        vals?.moisture    ?? null,
-            temperature:     vals?.temperature ?? null,
+            id: Date.now(),        // temp id for key
+            gateway_id: location,          // location = gateway_id in DB
+            node_id: device_id,
+            timestamp: timestamp,
+            humidity: vals?.humidity ?? null,
+            moisture: vals?.moisture ?? null,
+            temperature: vals?.temperature ?? null,
             battery_voltage: battery_mv ? battery_mv / 1000 : null,
-            measurements:    vals,
-            _live:           true,              // flag for optional "LIVE" badge in table
-            _calibration:    msg.trigger === 'manual', // calibration mode reading
+            measurements: vals,
+            _live: true,              // flag for optional "LIVE" badge in table
+            _calibration: msg.trigger === 'manual', // calibration mode reading
           };
 
           // Prepend to data (newest first) — cap at 300 rows to avoid mem growth
@@ -185,22 +185,22 @@ function App() {
           // Update sparkline history
           setHistoricalData(prev => {
             const key = `${location}-${device_id}`;
-            const grp = prev[key] || { humidity:[], moisture:[], temperature:[], battery_voltage:[] };
-            const push = (arr, val) => { if (val != null) { const a=[...arr,val]; if(a.length>10)a.shift(); return a; } return arr; };
+            const grp = prev[key] || { humidity: [], moisture: [], temperature: [], battery_voltage: [] };
+            const push = (arr, val) => { if (val != null) { const a = [...arr, val]; if (a.length > 10) a.shift(); return a; } return arr; };
             return {
               ...prev,
               [key]: {
-                humidity:        push(grp.humidity,        newReading.humidity),
-                moisture:        push(grp.moisture,        newReading.moisture),
-                temperature:     push(grp.temperature,     newReading.temperature),
+                humidity: push(grp.humidity, newReading.humidity),
+                moisture: push(grp.moisture, newReading.moisture),
+                temperature: push(grp.temperature, newReading.temperature),
                 battery_voltage: push(grp.battery_voltage, newReading.battery_voltage),
               }
             };
           });
 
           // Update location/device filter lists if new
-          setLocations(prev => prev.includes(location)    ? prev : [...prev, location]);
-          setDeviceIds( prev => prev.includes(device_id)  ? prev : [...prev, device_id]);
+          setLocations(prev => prev.includes(location) ? prev : [...prev, location]);
+          setDeviceIds(prev => prev.includes(device_id) ? prev : [...prev, device_id]);
           setLastUpdate(new Date());
 
           // Refresh stats counter
@@ -241,7 +241,7 @@ function App() {
       filtered = filtered.filter(r => new Date(r.timestamp) >= cutoff);
     }
     if (selectedLocation) filtered = filtered.filter(r => r.gateway_id === selectedLocation);
-    if (selectedDevice)   filtered = filtered.filter(r => r.node_id   === selectedDevice);
+    if (selectedDevice) filtered = filtered.filter(r => r.node_id === selectedDevice);
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       filtered = filtered.filter(r =>
@@ -271,9 +271,9 @@ function App() {
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `fillxpert-export-${new Date().toISOString().slice(0,10)}.csv`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `fillxpert-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
@@ -288,13 +288,13 @@ function App() {
       {authLoading ? (
         <div className="auth-loading-screen">
           <div className="spinner-large"></div>
-          <p>Loading FillXpert...</p>
+          <p>Loading SensorVault...</p>
         </div>
       ) : !isAuthenticated ? (
         <Routes>
-          <Route path="/login"    element={<Login />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="*"         element={<Navigate to="/login" />} />
+          <Route path="*" element={<Navigate to="/login" />} />
         </Routes>
       ) : (
         <div className={`app ${isRefreshing ? 'refreshing' : ''}`}>
@@ -308,7 +308,7 @@ function App() {
                   onClick={() => setSidebarOpen(!sidebarOpen)}
                   title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
                 >☰</button>
-                <h1 className="app-title">FillXpert Data Collection System</h1>
+                <h1 className="app-title">SensorVault Data Collection System</h1>
 
                 {/* REST API status */}
                 <div className="api-status" title="Backend REST API">
@@ -333,7 +333,7 @@ function App() {
                     Last: {lastUpdate.toLocaleTimeString()}
                   </span>
                 )}
-                <button className="btn btn-secondary" onClick={fetchData} disabled={loading} style={{padding:'5px 12px',fontSize:'0.8rem'}}>
+                <button className="btn btn-secondary" onClick={fetchData} disabled={loading} style={{ padding: '5px 12px', fontSize: '0.8rem' }}>
                   {loading ? '...' : 'Refresh'}
                 </button>
               </div>
@@ -370,17 +370,17 @@ function App() {
                       historicalData={historicalData}
                     />
                   } />
-                  <Route path="/manual-entry"               element={<ManualEntry />} />
-                  <Route path="/data-export"                element={<DataExport />} />
-                  <Route path="/settings"                   element={<Settings />} />
-                  <Route path="/devices"                    element={<Devices />} />
-                  <Route path="/devices/:deviceId/config"   element={<DeviceConfig />} />
+                  <Route path="/manual-entry" element={<ManualEntry />} />
+                  <Route path="/data-export" element={<DataExport />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/devices" element={<Devices />} />
+                  <Route path="/devices/:deviceId/config" element={<DeviceConfig />} />
                 </Routes>
               </div>
             </main>
 
             <footer className="app-footer">
-              <p>FillXpert Data Collection System v2.1.0 | Total Readings: {stats?.total_readings || 0}</p>
+              <p>SensorVault Data Collection System v2.1.0 | Total Readings: {stats?.total_readings || 0}</p>
             </footer>
           </div>
         </div>

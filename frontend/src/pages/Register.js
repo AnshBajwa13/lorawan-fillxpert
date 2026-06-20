@@ -45,7 +45,7 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -67,15 +67,15 @@ function Register() {
         email: formData.email,
         password: formData.password
       });
-      
+
       // Store tokens
       localStorage.setItem('access_token', loginResponse.data.access_token);
       localStorage.setItem('refresh_token', loginResponse.data.refresh_token);
-      
+
       // Redirect to dashboard
       navigate('/');
       window.location.reload(); // Refresh to update auth state
-      
+
     } catch (err) {
       setError(err.response?.data?.detail || 'Registration failed. Please try again.');
     } finally {
@@ -89,19 +89,19 @@ function Register() {
         <div className="register-header">
           <div className="logo-section">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <h1>Create Account</h1>
-          <p>Join the FillXpert field monitoring platform</p>
+          <p>Join the  field monitoring platform</p>
         </div>
 
         {error && (
           <div className="alert alert-error">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <span>{error}</span>
           </div>
@@ -144,7 +144,7 @@ function Register() {
               name="email"
               value={formData.email}
               onChange={handleChange}
-              placeholder="ansh@fillxpert.com"
+              placeholder="ansh@gmail.com"
               required
             />
           </div>
@@ -171,19 +171,19 @@ function Register() {
                     tabIndex={-1}
                     title={showPassword ? "Hide password" : "Show password"}
                   >
-                    <svg 
-                      width="20" 
-                      height="20" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
                       strokeWidth="2"
                       style={{ opacity: showPassword ? 0.5 : 1 }}
                     >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="3" />
                       {showPassword && (
-                        <line x1="1" y1="1" x2="23" y2="23" strokeWidth="2" strokeLinecap="round"/>
+                        <line x1="1" y1="1" x2="23" y2="23" strokeWidth="2" strokeLinecap="round" />
                       )}
                     </svg>
                   </button>
@@ -211,19 +211,19 @@ function Register() {
                     tabIndex={-1}
                     title={showConfirmPassword ? "Hide password" : "Show password"}
                   >
-                    <svg 
-                      width="20" 
-                      height="20" 
-                      viewBox="0 0 24 24" 
-                      fill="none" 
-                      stroke="currentColor" 
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
                       strokeWidth="2"
                       style={{ opacity: showConfirmPassword ? 0.5 : 1 }}
                     >
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="12" cy="12" r="3" />
                       {showConfirmPassword && (
-                        <line x1="1" y1="1" x2="23" y2="23" strokeWidth="2" strokeLinecap="round"/>
+                        <line x1="1" y1="1" x2="23" y2="23" strokeWidth="2" strokeLinecap="round" />
                       )}
                     </svg>
                   </button>
@@ -236,9 +236,9 @@ function Register() {
             <div className="requirement-item">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {formData.password.length >= 6 ? (
-                  <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
                 ) : (
-                  <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round" />
                 )}
               </svg>
               <span className={formData.password.length >= 6 ? 'met' : ''}>
@@ -248,9 +248,9 @@ function Register() {
             <div className="requirement-item">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {formData.password && formData.confirmPassword && formData.password === formData.confirmPassword ? (
-                  <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                  <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round" />
                 ) : (
-                  <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round" />
                 )}
               </svg>
               <span className={formData.password && formData.confirmPassword && formData.password === formData.confirmPassword ? 'met' : ''}>
@@ -263,14 +263,14 @@ function Register() {
             {loading ? (
               <>
                 <svg className="spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/>
+                  <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
                 </svg>
                 Creating Account...
               </>
             ) : (
               <>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M8.5 11a4 4 0 100-8 4 4 0 000 8zM20 8v6M23 11h-6" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M8.5 11a4 4 0 100-8 4 4 0 000 8zM20 8v6M23 11h-6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 Create Account
               </>
@@ -291,14 +291,14 @@ function Register() {
       <div className="register-info">
         <div className="info-content">
           <h2>Start Monitoring Your IoT Network</h2>
-          <p>Get started with FillXpert — a comprehensive platform for IoT sensor data collection and field monitoring.</p>
-          
+          <p>Get started with Sensorvault — a comprehensive platform for IoT sensor data collection and field monitoring.</p>
+
           <div className="benefits-list">
             <div className="benefit-item">
               <div className="benefit-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" strokeLinecap="round" strokeLinejoin="round"/>
-                  <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" strokeLinecap="round" strokeLinejoin="round" />
+                  <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               <div className="benefit-content">
@@ -310,10 +310,10 @@ function Register() {
             <div className="benefit-item">
               <div className="benefit-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="14" y="3" width="7" height="7" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="14" y="14" width="7" height="7" strokeLinecap="round" strokeLinejoin="round"/>
-                  <rect x="3" y="14" width="7" height="7" strokeLinecap="round" strokeLinejoin="round"/>
+                  <rect x="3" y="3" width="7" height="7" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="14" y="3" width="7" height="7" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="14" y="14" width="7" height="7" strokeLinecap="round" strokeLinejoin="round" />
+                  <rect x="3" y="14" width="7" height="7" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               <div className="benefit-content">
@@ -325,7 +325,7 @@ function Register() {
             <div className="benefit-item">
               <div className="benefit-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
               <div className="benefit-content">
