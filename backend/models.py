@@ -51,11 +51,16 @@ class SensorReading(Base):
             "moisture": self.moisture,
             "temperature": self.temperature,
             "battery_voltage": self.battery_voltage,
+            # MQTT fields — must be returned so dashboard can display them
+            "trigger":  self.trigger,    # "schedule" / "button" / "manual"
+            "rssi_dbm": self.rssi_dbm,   # signal strength dBm
+            "cfg_ver":  self.cfg_ver,    # config version device was running
+            "msg_id":   self.msg_id,     # dedup key
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
-        
+
         # Add dynamic measurements if present
         if self.measurements:
             result["measurements"] = self.measurements
-        
+
         return result
