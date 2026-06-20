@@ -119,8 +119,19 @@ export default function DeviceConfig() {
     }
   };
 
-  if (loading) return <div className="dconfig-loading">Loading device...</div>;
-  if (error && !device) return <div className="dconfig-error">{error}</div>;
+  if (loading) return (
+    <div className="dconfig-page">
+      <button className="back-btn" onClick={() => navigate('/devices')}>Back to Fleet</button>
+      <div className="dconfig-loading">Loading device...</div>
+    </div>
+  );
+
+  if (!device) return (
+    <div className="dconfig-page">
+      <button className="back-btn" onClick={() => navigate('/devices')}>Back to Fleet</button>
+      <div className="dconfig-error">{error || 'Device not found. It may have been deleted or does not belong to your account.'}</div>
+    </div>
+  );
 
   const payloadPreview = buildPayloadPreview();
 
