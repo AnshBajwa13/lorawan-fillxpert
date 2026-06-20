@@ -49,6 +49,11 @@ function Dashboard({
               <option value="24">Last 24 Hours</option>
               <option value="168">Last 7 Days</option>
               <option value="720">Last 30 Days</option>
+              <option value="2160">Last 90 Days</option>
+              <option value="4380">Last 180 Days</option>
+              <option value="8760">Last 1 Year</option>
+              <option value="26280">Last 3 Years</option>
+              <option value="43800">Last 5 Years</option>
             </select>
           </div>
 
