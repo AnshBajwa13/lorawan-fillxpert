@@ -111,29 +111,40 @@ class DeviceConfig(Base):
     time2_hour  = Column(Integer, nullable=True,  default=14)  # NULL = only 1 reading
     time2_min   = Column(Integer, nullable=True,  default=0)
 
-    # Compact 12-char string sent to device via MQTT
-    # e.g. "011000140002"
-    payload_str = Column(String(12), nullable=False)
+    # Compact payload string sent to device via MQTT (dynamic length)
+    # 8 chars (1×), 12 chars (2×), 16 chars (3×), 20 chars (4×)
+    # Format: [sensor:2][freq:2][time1:4][time2:4?][time3:4?][time4:4?]
+    # e.g. "010210001400"  → moisture, 2×/day, 10:00 + 14:00
+    payload_str = Column(String(20), nullable=False)
 
     # Delivery tracking
     published_at  = Column(DateTime, server_default=func.now())
     ack_received  = Column(Boolean, nullable=False, default=False)
     ack_at        = Column(DateTime, nullable=True)
 
+    # Extended time slots (time3/time4 for 3×/4×/day configs)
+    time3_hour  = Column(Integer, nullable=True)
+    time3_min   = Column(Integer, nullable=True)
+    time4_hour  = Column(Integer, nullable=True)
+    time4_min   = Column(Integer, nullable=True)
+
     __table_args__ = (
         Index("idx_device_cfg_version", "device_id", "cfg_version"),
     )
 
     def to_dict(self):
+        def fmt(h, m):
+            return f"{h:02d}:{m:02d}" if h is not None else None
         return {
             "id":           self.id,
             "device_id":    self.device_id,
             "cfg_version":  self.cfg_version,
             "sensor_type":  self.sensor_type,
             "freq":         self.freq,
-            "time1":        f"{self.time1_hour:02d}:{self.time1_min:02d}",
-            "time2":        (f"{self.time2_hour:02d}:{self.time2_min:02d}"
-                             if self.time2_hour is not None else None),
+            "time1":        fmt(self.time1_hour, self.time1_min),
+            "time2":        fmt(self.time2_hour, self.time2_min),
+            "time3":        fmt(self.time3_hour, self.time3_min),
+            "time4":        fmt(self.time4_hour, self.time4_min),
             "payload_str":  self.payload_str,
             "published_at": self.published_at.isoformat() if self.published_at else None,
             "ack_received": self.ack_received,
@@ -165,17 +176,27 @@ def _rssi_label(rssi: int | None) -> str:
     return "poor"
 
 
-def build_config_payload(sensor_type: str, time1_h: int, time1_m: int,
-                          time2_h: int | None, time2_m: int | None,
-                          freq: int) -> str:
+def build_config_payload(sensor_type: str, freq: int,
+                          times: list[tuple[int | None, int | None]]) -> str:
     """
-    Build the 12-character compact config string for the device firmware.
+    Build dynamic config string for device firmware.
 
-    Format: [sensor_code:2][time1_H:2][time1_M:2][time2_H:2][time2_M:2][freq:2]
-    Example: "011000140002"  → moisture, 10:00 & 14:00, 2×/day
-    If freq=1 (one reading only): time2 slots set to "9999"
+    New format: [sensor_code:2][freq:2][timeN:4 × freq]
+    Each time slot is HHMM (4 chars). Only `freq` slots are appended.
+
+    Examples:
+      freq=1  → "01011000"            (8 chars)
+      freq=2  → "010210001400"         (12 chars)
+      freq=3  → "0103100014000800"     (16 chars)
+      freq=4  → "01041000140008001600" (20 chars)
     """
     code = SENSOR_NAME_TO_CODE.get(sensor_type, "01")
-    if freq == 1 or time2_h is None:
-        return f"{code}{time1_h:02d}{time1_m:02d}9999{freq:02d}"
-    return f"{code}{time1_h:02d}{time1_m:02d}{time2_h:02d}{time2_m:02d}{freq:02d}"
+    parts = [code, f"{freq:02d}"]
+    for i in range(freq):
+        h, m = times[i] if i < len(times) else (None, None)
+        if h is None or m is None:
+            # Fallback: if time not provided, use 00:00
+            parts.append("0000")
+        else:
+            parts.append(f"{h:02d}{m:02d}")
+    return "".join(parts)

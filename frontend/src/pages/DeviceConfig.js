@@ -68,23 +68,17 @@ export default function DeviceConfig() {
     load();
   }, [deviceId]); // eslint-disable-line
 
-  // ── Payload preview ─────────────────────────────────────────────────
+  // ── Payload preview — new format: [sensor:2][freq:2][timeN:4×freq] ──
   const buildPayloadPreview = () => {
     const codes = { moisture:'01', temperature:'02', npk:'03', ph:'04', ultrasonic:'05', humidity:'06' };
     const code  = codes[sensorType] || '01';
-    // Take first `freq` times — remaining slots padded with "9999"
-    const slots = [];
-    for (let i = 0; i < 4; i++) {
-      if (i < freq) {
-        const [h, m] = times[i].split(':');
-        slots.push(h.padStart(2,'0') + m.padStart(2,'0'));
-      } else {
-        slots.push('9999');
-      }
+    const freqStr = String(freq).padStart(2, '0');
+    let slots = '';
+    for (let i = 0; i < freq; i++) {
+      const [h, m] = times[i].split(':');
+      slots += h.padStart(2,'0') + m.padStart(2,'0');
     }
-    // Firmware payload: [sensor:2][slot1:4][slot2:4][freq:2]
-    // Backend only uses time1+time2 but we show full expansion
-    return `${code}${slots[0]}${slots[1]}${String(freq).padStart(2,'0')}`;
+    return `${code}${freqStr}${slots}`;
   };
 
   const updateTime = (idx, value) => {
@@ -96,12 +90,13 @@ export default function DeviceConfig() {
     e.preventDefault();
     setPushing(true); setSuccess(null); setError(null);
     try {
-      // Backend currently supports time1 + time2. We send first two.
       const body = {
         sensor_type: sensorType,
         freq,
         time1: times[0],
         time2: freq >= 2 ? times[1] : null,
+        time3: freq >= 3 ? times[2] : null,
+        time4: freq >= 4 ? times[3] : null,
       };
       const res = await axios.post(`${API_URL}/api/devices/${deviceId}/config`, body);
       setSuccess(res.data.message || `Config v${res.data.cfg_version} pushed successfully.`);
@@ -257,7 +252,14 @@ export default function DeviceConfig() {
             <div key={cfg.id} className="history-row">
               <div className="history-version">v{cfg.cfg_version}</div>
               <div className="history-details">
-                <span>{cfg.sensor_type} · {cfg.time1}{cfg.time2 ? ` & ${cfg.time2}` : ''} · {cfg.freq}×/day</span>
+                  <span>
+                    {cfg.sensor_type}
+                    {' · '}{cfg.time1}
+                    {cfg.time2 ? ` & ${cfg.time2}` : ''}
+                    {cfg.time3 ? ` & ${cfg.time3}` : ''}
+                    {cfg.time4 ? ` & ${cfg.time4}` : ''}
+                    {' · '}{cfg.freq}×/day
+                  </span>
                 <code>{cfg.payload_str}</code>
                 <small>Pushed: {new Date(cfg.published_at).toLocaleString()}</small>
               </div>

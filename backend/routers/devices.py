@@ -38,9 +38,11 @@ class DeviceCreate(BaseModel):
 
 class DeviceConfigPush(BaseModel):
     sensor_type: str
-    freq:        int = 2         # 1 or 2 readings per day
-    time1:       str = "10:00"   # "HH:MM"
-    time2:       Optional[str] = "14:00"  # "HH:MM" or None if freq=1
+    freq:        int = 2           # 1–4 readings per day
+    time1:       str = "10:00"    # "HH:MM" — always required
+    time2:       Optional[str] = "14:00"   # required if freq >= 2
+    time3:       Optional[str] = None      # required if freq >= 3
+    time4:       Optional[str] = None      # required if freq == 4
 
 
 # ---------------------------------------------------------------------------
@@ -144,21 +146,21 @@ async def push_config(
                    f"Valid: {list(SENSOR_TYPE_MAP.values())}",
         )
 
-    # Parse times
+    # Parse all time slots based on freq
     try:
         t1h, t1m = _parse_time(body.time1)
-        t2h, t2m = (_parse_time(body.time2) if body.time2 and body.freq >= 2
-                    else (None, None))
+        t2h, t2m = (_parse_time(body.time2) if body.time2 and body.freq >= 2 else (None, None))
+        t3h, t3m = (_parse_time(body.time3) if body.time3 and body.freq >= 3 else (None, None))
+        t4h, t4m = (_parse_time(body.time4) if body.time4 and body.freq >= 4 else (None, None))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=str(e))
 
-    # Build compact 12-char payload string
+    # Build dynamic payload: [sensor:2][freq:2][timeN:4 × freq]
     payload_str = build_config_payload(
         sensor_type=body.sensor_type,
-        time1_h=t1h, time1_m=t1m,
-        time2_h=t2h, time2_m=t2m,
         freq=body.freq,
+        times=[(t1h, t1m), (t2h, t2m), (t3h, t3m), (t4h, t4m)],
     )
 
     # Increment config version
@@ -197,6 +199,10 @@ async def push_config(
         time1_min   = t1m,
         time2_hour  = t2h,
         time2_min   = t2m,
+        time3_hour  = t3h,
+        time3_min   = t3m,
+        time4_hour  = t4h,
+        time4_min   = t4m,
         payload_str = payload_str,
         ack_received= False,
     )
