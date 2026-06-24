@@ -333,7 +333,7 @@ async def get_stats(
         "total_readings": total_readings,
         "total_gateways": total_gateways,
         "total_nodes": total_nodes,
-        "latest_reading_time": latest_reading.timestamp.isoformat() if latest_reading else None
+        "latest_reading_time": latest_reading.timestamp.isoformat() + "Z" if latest_reading else None
     }
 
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import './Stats.css';
+import { toLocalStr } from '../utils/time';
 
 function Stats({ stats }) {
   return (
@@ -30,7 +31,7 @@ function Stats({ stats }) {
           <h3>Last Reading</h3>
           <p className="stat-value small">
             {stats.latest_reading_time
-              ? new Date(stats.latest_reading_time).toLocaleString()
+              ? toLocalStr(stats.latest_reading_time)
               : 'No data'}
           </p>
         </div>

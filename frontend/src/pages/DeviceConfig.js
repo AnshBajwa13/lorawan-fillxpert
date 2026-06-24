@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './DeviceConfig.css';
+import { toLocalStr } from '../utils/time';
+
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -298,7 +300,7 @@ export default function DeviceConfig() {
                     {' · '}{cfg.freq}×/day
                   </span>
                 <code>{cfg.payload_str}</code>
-                <small>Pushed: {new Date(cfg.published_at).toLocaleString()}</small>
+                <small>Pushed: {toLocalStr(cfg.published_at)}</small>
               </div>
               <div className="history-ack">
                 {cfg.ack_received

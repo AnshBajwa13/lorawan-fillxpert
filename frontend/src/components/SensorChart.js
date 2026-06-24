@@ -28,6 +28,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import './SensorChart.css';
+import { toChartLabel } from '../utils/time';
 
 // ─── Metric configuration ────────────────────────────────────────────────────
 // Each metric: field name in the data row, display label, unit, chart colour
@@ -82,17 +83,10 @@ function SensorChart({ filteredData = [], selectedDevice = '', selectedLocation 
     const slice = [...filteredData].slice(0, 50).reverse();
 
     return slice.map(row => {
-      // Format timestamp for X-axis label
       let timeLabel = '—';
       if (row.timestamp) {
-        const d = new Date(row.timestamp);
-        if (!isNaN(d)) {
-          // "Jun 11 10:35" — short enough for axis
-          timeLabel = d.toLocaleString('en-IN', {
-            month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', hour12: false,
-          });
-        }
+        const label = toChartLabel(row.timestamp);
+        if (label) timeLabel = label;
       }
 
       return {

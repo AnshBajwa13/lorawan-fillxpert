@@ -1,5 +1,6 @@
 import React from 'react';
 import './DataTable.css';
+import { toLocalStr } from '../utils/time';
 import Sparkline from './Sparkline';
 
 function DataTable({ data, loading, totalCount, filteredCount, historicalData = {} }) {
@@ -118,7 +119,7 @@ function DataTable({ data, loading, totalCount, filteredCount, historicalData = 
                     }
                   </td>
                   <td className="timestamp">
-                    {new Date(reading.timestamp).toLocaleString()}
+                    {toLocalStr(reading.timestamp)}
                     {isLive && <span className="live-dot" title="Just received via MQTT">●</span>}
                   </td>
 
