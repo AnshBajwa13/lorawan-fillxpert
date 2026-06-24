@@ -243,7 +243,7 @@ async def receive_sensor_data(
 async def get_sensor_data(
     gateway_id: Optional[str] = Query(None, description="Filter by gateway ID"),
     node_id: Optional[str] = Query(None, description="Filter by node ID"),
-    limit: int = Query(100, ge=1, le=1000, description="Number of records to return"),
+    limit: int = Query(100, ge=1, le=50000, description="Number of records to return"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     hours: Optional[int] = Query(None, ge=1, description="Get data from last N hours"),
     current_user: User = Depends(get_current_user),

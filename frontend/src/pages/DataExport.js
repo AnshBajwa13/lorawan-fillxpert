@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './DataExport.css';
+import { toLocalStr } from '../utils/time';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 function DataExport() {
   const [exportConfig, setExportConfig] = useState({
-    location:  '',   // gateway_id in DB
-    device_id: '',   // node_id in DB
-    hours:     '24',
-    format:    'csv',
+    location: '',
+    device_id: '',
+    hours: 'all',   // 'all' = no time limit, or number string like '24', '720'
+    format: 'csv',
   });
 
-  const [devices,  setDevices]  = useState([]);
-  const [loading,  setLoading]  = useState(false);
-  const [stats,    setStats]    = useState(null);
-  const [message,  setMessage]  = useState({ type: '', text: '' });
+  const [devices, setDevices] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
     fetchDevices();
@@ -62,6 +63,8 @@ function DataExport() {
             const k = h.replace('meas_', '');
             return item.measurements?.[k] ?? '';
           }
+          // Format timestamp to human-readable IST
+          if (h === 'timestamp') return `"${toLocalStr(item[h])}"`;
           const v = item[h];
           if (v === null || v === undefined) return '';
           if (typeof v === 'string' && v.includes(',')) return `"${v}"`;
@@ -73,7 +76,7 @@ function DataExport() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `fillxpert-export-${new Date().toISOString().slice(0,10)}.csv`;
+    link.download = `sensorvault-export-${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
     setMessage({ type: 'success', text: `Exported ${data.length} readings as CSV.` });
   };
@@ -83,7 +86,7 @@ function DataExport() {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `fillxpert-export-${new Date().toISOString().slice(0,10)}.json`;
+    link.download = `sensorvault-export-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     setMessage({ type: 'success', text: `Exported ${data.length} readings as JSON.` });
   };
@@ -93,8 +96,12 @@ function DataExport() {
     setLoading(true);
     setMessage({ type: '', text: '' });
     try {
-      const params = { limit: 10000, hours: parseInt(exportConfig.hours) };
-      // gateway_id = location, node_id = device_id (column names in DB)
+      // limit 50000 — enough for 45 years of 3 readings/day on 1 device
+      const params = { limit: 50000 };
+      // Only pass hours param if not "All Time"
+      if (exportConfig.hours && exportConfig.hours !== 'all') {
+        params.hours = parseInt(exportConfig.hours);
+      }
       if (exportConfig.location)  params.gateway_id = exportConfig.location;
       if (exportConfig.device_id) params.node_id    = exportConfig.device_id;
 
@@ -123,7 +130,7 @@ function DataExport() {
       {message.text && (
         <div className={`alert alert-${message.type}`}>
           {message.text}
-          <button onClick={() => setMessage({ type:'', text:'' })}>×</button>
+          <button onClick={() => setMessage({ type: '', text: '' })}>×</button>
         </div>
       )}
 
@@ -153,6 +160,7 @@ function DataExport() {
           <div className="form-group">
             <label>Time Range</label>
             <select name="hours" value={exportConfig.hours} onChange={handleInputChange}>
+              <option value="all">All Time (every reading)</option>
               <option value="1">Last 1 Hour</option>
               <option value="6">Last 6 Hours</option>
               <option value="24">Last 24 Hours</option>
