@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './DeviceConfig.css';
@@ -35,38 +35,62 @@ export default function DeviceConfig() {
   // reading times — one slot per reading; up to 4
   const [times, setTimes] = useState(['10:00', '14:00', '08:00', '16:00']);
 
-  // ── Load device ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [devRes, histRes] = await Promise.all([
-          axios.get(`${API_URL}/api/devices/${deviceId}`),
-          axios.get(`${API_URL}/api/devices/${deviceId}/configs`),
-        ]);
-        const dev = devRes.data;
-        setDevice(dev);
-        setHistory(histRes.data);
+  // ── WebSocket ref (for auto-updating Applied badge on ACK) ────────────
+  const wsRef = useRef(null);
 
-        if (dev.latest_config) {
-          const lc = dev.latest_config;
-          setSensorType(lc.sensor_type || 'moisture');
-          const f = lc.freq || 2;
-          setFreq(f);
-          const newTimes = [...times];
-          if (lc.time1) newTimes[0] = lc.time1;
-          if (lc.time2) newTimes[1] = lc.time2;
-          setTimes(newTimes);
-        } else {
-          setSensorType(dev.sensor_type || 'moisture');
-        }
-      } catch {
-        setError('Device not found.');
-      } finally {
-        setLoading(false);
+  // ── Load device — extracted so Refresh button + WebSocket can call it ──
+  const load = useCallback(async () => {
+    try {
+      const [devRes, histRes] = await Promise.all([
+        axios.get(`${API_URL}/api/devices/${deviceId}`),
+        axios.get(`${API_URL}/api/devices/${deviceId}/configs`),
+      ]);
+      const dev = devRes.data;
+      setDevice(dev);
+      setHistory(histRes.data);
+
+      if (dev.latest_config) {
+        const lc = dev.latest_config;
+        setSensorType(lc.sensor_type || 'moisture');
+        const f = lc.freq || 2;
+        setFreq(f);
+        const newTimes = [...times];
+        if (lc.time1) newTimes[0] = lc.time1;
+        if (lc.time2) newTimes[1] = lc.time2;
+        setTimes(newTimes);
+      } else {
+        setSensorType(dev.sensor_type || 'moisture');
       }
-    };
-    load();
+    } catch {
+      setError('Device not found.');
+    } finally {
+      setLoading(false);
+    }
   }, [deviceId]); // eslint-disable-line
+
+  // Initial load on mount
+  useEffect(() => { load(); }, [deviceId]); // eslint-disable-line
+
+  // ── WebSocket: auto-update Applied badge when device sends config ACK ──
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    const WS_URL = API_URL.replace(/^http/, 'ws') + '/ws/realtime';
+    const ws = new WebSocket(`${WS_URL}?token=${token}`);
+    wsRef.current = ws;
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        // When THIS device sends a config ACK, re-fetch so badge flips to Applied
+        if (msg.event === 'config_acked' && msg.device_id === deviceId) {
+          load();
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    return () => ws.close();
+  }, [deviceId, load]);
 
   // ── Payload preview — format: [sensor:2][freq:2][timeN:4×freq][ver:2] ──
   const buildPayloadPreview = () => {
@@ -134,9 +158,18 @@ export default function DeviceConfig() {
   return (
     <div className="dconfig-page">
 
-      <button className="back-btn" onClick={() => navigate('/devices')}>
-        Back to Fleet
-      </button>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+        <button className="back-btn" onClick={() => navigate('/devices')} style={{ margin: 0 }}>
+          Back to Fleet
+        </button>
+        <button
+          className="back-btn"
+          onClick={load}
+          style={{ margin: 0, background: '#f4f4f5', color: '#3f3f46' }}
+        >
+          Refresh
+        </button>
+      </div>
 
       {/* Device header */}
       <div className="dconfig-header">
