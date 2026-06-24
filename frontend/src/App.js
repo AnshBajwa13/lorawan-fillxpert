@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import './App.css';
+import { toLocalStr } from './utils/time';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import ManualEntry from './pages/ManualEntry';
@@ -99,15 +100,23 @@ function App() {
     return history;
   }, []);
 
-  // ── Initial data fetch (runs once on login) ───────────────────────────
-  const fetchData = useCallback(async () => {
+  // ── Data fetch — server-side time range filtering ───────────────────────────
+  // hoursParam: number of hours to fetch, or 'all' for everything
+  // The backend already supports ?hours=N&limit=N — we just weren't using it!
+  const fetchData = useCallback(async (hoursParam) => {
     try {
       setLoading(true);
       setIsRefreshing(true);
       setError(null);
 
+      // Build API params — pass hours to server so we get ALL readings for that period
+      // limit 1000: enough for 1 year of 3-readings/day on 1 device (1095 readings/year)
+      const params = { limit: 1000 };
+      const h = hoursParam !== undefined ? hoursParam : timeRange;
+      if (h && h !== 'all') params.hours = parseInt(h) || 24;
+
       const [readingsRes, statsRes] = await Promise.all([
-        axios.get(`${API_URL}/api/sensor-data`, { params: { limit: 200 } }),
+        axios.get(`${API_URL}/api/sensor-data`, { params }),
         axios.get(`${API_URL}/api/stats`),
       ]);
 
@@ -130,7 +139,7 @@ function App() {
       setLoading(false);
       setTimeout(() => setIsRefreshing(false), 400);
     }
-  }, [buildHistoricalData]);
+  }, [buildHistoricalData, timeRange]);
 
   // ── WebSocket — live MQTT-to-browser bridge ───────────────────────────
   //
@@ -221,28 +230,34 @@ function App() {
     };
   }, [isAuthenticated]);
 
-  // Connect WebSocket on login
+  // Connect WebSocket on login + initial data load
   useEffect(() => {
     if (isAuthenticated) {
-      fetchData();
+      fetchData(timeRange);
       connectWebSocket();
     }
     return () => {
       wsRef.current?.close();
       clearTimeout(wsRetryRef.current);
     };
-  }, [isAuthenticated, fetchData, connectWebSocket]);
+  }, [isAuthenticated, connectWebSocket]); // eslint-disable-line
 
-  // ── Filter data ───────────────────────────────────────────────────────
+  // Re-fetch from server when time range changes (server-side filter)
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchData(timeRange);
+    }
+  }, [timeRange]); // eslint-disable-line
+
+  // ── Filter data (client-side: location, device, search only) ──────────────────────
+  // NOTE: time range filtering is now done SERVER-SIDE in fetchData().
+  // This effect only handles instant client-side filters (no network call needed).
   useEffect(() => {
     let filtered = [...data];
 
-    if (timeRange !== 'all') {
-      const cutoff = new Date(Date.now() - parseInt(timeRange) * 3_600_000);
-      filtered = filtered.filter(r => new Date(r.timestamp) >= cutoff);
-    }
+    // location / device / search — instant, no API call
     if (selectedLocation) filtered = filtered.filter(r => r.gateway_id === selectedLocation);
-    if (selectedDevice) filtered = filtered.filter(r => r.node_id === selectedDevice);
+    if (selectedDevice)   filtered = filtered.filter(r => r.node_id   === selectedDevice);
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       filtered = filtered.filter(r =>
@@ -252,7 +267,7 @@ function App() {
     }
 
     setFilteredData(filtered);
-  }, [data, timeRange, selectedLocation, selectedDevice, searchTerm]);
+  }, [data, selectedLocation, selectedDevice, searchTerm]);
 
   // ── CSV export ────────────────────────────────────────────────────────
   const exportToCSV = () => {
@@ -262,13 +277,18 @@ function App() {
       if (item.measurements) Object.keys(item.measurements).forEach(k => allKeys.add(k));
     });
     const headers = ['ID', 'Location', 'Device ID', 'Timestamp',
-      'Humidity', 'Moisture', 'Temperature', 'Battery (V)',
-      ...Array.from(allKeys).map(k => `custom_${k}`)];
+      'Humidity (%)', 'Moisture (%)', 'Temperature (°C)', 'Battery (V)',
+      ...Array.from(allKeys).map(k => k.toUpperCase().replace(/_/g, ' '))];
     const rows = filteredData.map(item => [
-      item.id, item.gateway_id, item.node_id, item.timestamp,
-      item.humidity || '', item.moisture || '',
-      item.temperature || '', item.battery_voltage || '',
-      ...Array.from(allKeys).map(k => item.measurements?.[k] || '')
+      item.id,
+      item.gateway_id,
+      item.node_id,
+      toLocalStr(item.timestamp),   // ✔ human-readable IST e.g. "6/24/2026, 11:32:43 AM"
+      item.humidity    ?? '',
+      item.moisture    ?? '',
+      item.temperature ?? '',
+      item.battery_voltage ?? '',
+      ...Array.from(allKeys).map(k => item.measurements?.[k] ?? '')
     ]);
     const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -277,6 +297,7 @@ function App() {
     a.href = url; a.download = `fillxpert-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
+
 
   const resetFilters = () => {
     setSelectedLocation(''); setSelectedDevice('');
