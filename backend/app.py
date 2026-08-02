@@ -278,6 +278,27 @@ async def get_sensor_data(
     return readings
 
 
+@app.delete("/api/sensor-data")
+async def delete_sensor_data(
+    node_id: str = Query(..., description="Delete all readings for this node/device ID"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk-delete all sensor readings for one device (e.g. cleaning up test data).
+    Scoped to the logged-in user's own data — cannot touch other users' readings.
+    This is separate from device registration: deleting a device does NOT delete
+    its readings, and this endpoint does NOT delete the device registration.
+    """
+    deleted_count = (
+        db.query(SensorReading)
+        .filter(SensorReading.user_id == current_user.id, SensorReading.node_id == node_id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"node_id": node_id, "deleted_count": deleted_count}
+
+
 @app.get("/api/gateways", response_model=List[str])
 async def get_gateways(
     current_user: User = Depends(get_current_user),

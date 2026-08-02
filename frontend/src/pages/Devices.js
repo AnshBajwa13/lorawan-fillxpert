@@ -151,6 +151,31 @@ export default function Devices() {
     }
   };
 
+  // ── Bulk-delete all readings for a device (separate from device delete) ─
+  const handleDeleteReadings = async (device) => {
+    const typed = window.prompt(
+      `This permanently deletes ALL historical readings for "${device.device_id}" ` +
+      `from the Dashboard and exports. This CANNOT be undone.\n\n` +
+      `Type the device ID (${device.device_id}) to confirm:`
+    );
+    if (typed !== device.device_id) {
+      if (typed !== null) alert('Device ID did not match — nothing was deleted.');
+      return;
+    }
+
+    setDeletingId(device.device_id);
+    try {
+      const res = await axios.delete(`${API_URL}/api/sensor-data`, {
+        params: { node_id: device.device_id },
+      });
+      alert(`Deleted ${res.data.deleted_count} reading(s) for ${device.device_id}.`);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to delete readings.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // ── Helpers ───────────────────────────────────────────────────────────
   const batteryClass = (pct) => {
     if (pct == null) return 'muted';
@@ -264,6 +289,15 @@ export default function Devices() {
           onClick={e => { e.stopPropagation(); handleDeleteDevice(device); }}
         >
           {deletingId === device.device_id ? 'Deleting…' : 'Delete'}
+        </button>
+        <button
+          className="btn-configure"
+          style={{ color: '#991b1b', borderColor: '#991b1b' }}
+          disabled={deletingId === device.device_id}
+          onClick={e => { e.stopPropagation(); handleDeleteReadings(device); }}
+          title="Permanently delete all historical readings for this device"
+        >
+          Delete Readings
         </button>
       </div>
     </div>
