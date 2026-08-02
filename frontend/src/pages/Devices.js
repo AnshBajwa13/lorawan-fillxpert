@@ -312,7 +312,7 @@ export default function Devices() {
                   value={newDevice.device_type}
                   onChange={e => setNewDevice(p => ({ ...p, device_type: e.target.value, gateway_device_id: '', lora_addr: '' }))}
                 >
-                  <option value="direct_esim">eSIM Node (direct cellular — old architecture)</option>
+                  <option value="direct_esim">eSIM Node (Direct Cellular)</option>
                   <option value="gateway">LoRa Gateway (eSIM + LoRa receiver)</option>
                   <option value="sensor_node">LoRa Sensor Node (no SIM — sends via gateway)</option>
                 </select>
