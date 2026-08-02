@@ -34,6 +34,10 @@ class DeviceCreate(BaseModel):
     location:    str            # e.g. "sangrur" — must match MQTT topic level
     sensor_type: str = "moisture"
     description: Optional[str] = None
+    # LoRa gateway architecture fields (optional — defaults for backward compat)
+    device_type:       str = "direct_esim"   # "gateway" | "sensor_node" | "direct_esim"
+    gateway_device_id: Optional[str] = None  # parent gateway device_id (for sensor_node)
+    lora_addr:         Optional[int] = None  # LoRa address byte (0x01, 0x02, ...) for sensor_node
 
 
 class DeviceConfigPush(BaseModel):
@@ -88,21 +92,47 @@ def register_device(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Device '{body.device_id}' is already registered.",
         )
+
+    # Validate device_type
+    valid_types = {"gateway", "sensor_node", "direct_esim"}
+    if body.device_type not in valid_types:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid device_type '{body.device_type}'. Valid: {sorted(valid_types)}",
+        )
+
+    # Validate gateway_device_id exists if provided (sensor_node must point to a real gateway)
+    if body.gateway_device_id:
+        gw = db.query(Device).filter(
+            Device.device_id == body.gateway_device_id,
+            Device.device_type == "gateway",
+        ).first()
+        if not gw:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Gateway '{body.gateway_device_id}' not found or is not a gateway device.",
+            )
+
     device = Device(
-        device_id   = body.device_id,
-        user_id     = current_user.id,
-        name        = body.name or body.device_id,
-        location    = body.location,
-        sensor_type = body.sensor_type,
-        description = body.description,
-        cfg_version = 0,
+        device_id         = body.device_id,
+        user_id           = current_user.id,
+        name              = body.name or body.device_id,
+        location          = body.location,
+        sensor_type       = body.sensor_type,
+        description       = body.description,
+        cfg_version       = 0,
         cfg_version_acked = 0,
-        is_online   = False,
+        is_online         = False,
+        # LoRa gateway architecture
+        device_type       = body.device_type,
+        gateway_device_id = body.gateway_device_id,
+        lora_addr         = body.lora_addr,
     )
     db.add(device)
     db.commit()
     db.refresh(device)
-    logger.info("Registered device %s for user %d", body.device_id, current_user.id)
+    logger.info("Registered device %s (type: %s) for user %d",
+                body.device_id, body.device_type, current_user.id)
     return device.to_dict()
 
 

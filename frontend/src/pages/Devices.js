@@ -6,7 +6,7 @@ import './Devices.css';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 const WS_URL  = (API_URL.replace('http', 'ws')) + '/ws/realtime';
 
-// No emojis — plain text labels
+// Sensor type → human-readable label
 const SENSOR_LABELS = {
   moisture:    'Moisture',
   temperature: 'Temperature',
@@ -16,13 +16,28 @@ const SENSOR_LABELS = {
   humidity:    'Humidity',
 };
 
+const DEVICE_TYPE_LABELS = {
+  gateway:     'LoRa Gateway',
+  sensor_node: 'LoRa Node',
+  direct_esim: 'eSIM Node',
+};
+
+const DEVICE_TYPE_COLORS = {
+  gateway:     '#7c3aed',   // purple
+  sensor_node: '#15803d',   // green
+  direct_esim: '#0369a1',   // blue
+};
+
 export default function Devices() {
   const [devices, setDevices]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [addError, setAddError]   = useState('');
-  const [newDevice, setNewDevice] = useState({ device_id: '', name: '', location: '', sensor_type: 'moisture' });
+  const [newDevice, setNewDevice] = useState({
+    device_id: '', name: '', location: '', sensor_type: 'moisture',
+    device_type: 'direct_esim', gateway_device_id: '', lora_addr: '',
+  });
   const [adding, setAdding]       = useState(false);
   const wsRef                     = useRef(null);
   const navigate                  = useNavigate();
@@ -89,10 +104,25 @@ export default function Devices() {
     setAdding(true);
     setAddError('');
     try {
-      const res = await axios.post(`${API_URL}/api/devices`, newDevice);
+      const payload = {
+        device_id:   newDevice.device_id,
+        name:        newDevice.name || undefined,
+        location:    newDevice.location,
+        sensor_type: newDevice.sensor_type,
+        device_type: newDevice.device_type,
+        // Only include optional LoRa fields if they have values
+        ...(newDevice.gateway_device_id ? { gateway_device_id: newDevice.gateway_device_id } : {}),
+        ...(newDevice.lora_addr !== '' && newDevice.lora_addr != null
+          ? { lora_addr: parseInt(newDevice.lora_addr, 10) }
+          : {}),
+      };
+      const res = await axios.post(`${API_URL}/api/devices`, payload);
       setDevices(prev => [res.data, ...prev]);
       setShowAdd(false);
-      setNewDevice({ device_id: '', name: '', location: '', sensor_type: 'moisture' });
+      setNewDevice({
+        device_id: '', name: '', location: '', sensor_type: 'moisture',
+        device_type: 'direct_esim', gateway_device_id: '', lora_addr: '',
+      });
     } catch (err) {
       setAddError(err.response?.data?.detail || 'Failed to register device.');
     } finally {
@@ -124,6 +154,92 @@ export default function Devices() {
 
   const onlineCount = devices.filter(d => d.is_online).length;
 
+  // ── Device grouping for LoRa architecture ────────────────────────────
+  // Gateways render first with their sensor_nodes nested inside.
+  // direct_esim devices render in their own flat section after.
+  const gateways    = devices.filter(d => d.device_type === 'gateway');
+  const sensorNodes = devices.filter(d => d.device_type === 'sensor_node');
+  const directEsim  = devices.filter(d => d.device_type === 'direct_esim' || !d.device_type);
+  const gatewayIds  = new Set(gateways.map(g => g.device_id));
+  // Ungrouped sensor nodes (gateway not registered yet)
+  const ungroupedNodes = sensorNodes.filter(n => !gatewayIds.has(n.gateway_device_id));
+
+  // Helper: render a single device card
+  const DeviceCard = ({ device, compact = false }) => (
+    <div
+      key={device.device_id}
+      className={`device-card ${device.is_online ? 'online' : 'offline'}${compact ? ' compact' : ''}`}
+      onClick={() => navigate(`/devices/${device.device_id}/config`)}
+      style={compact ? { marginLeft: '24px', marginTop: '8px', borderLeft: '3px solid #e4e4e7' } : {}}
+    >
+      <div className="device-card-header">
+        <div>
+          <div className="device-name">
+            {device.name || device.device_id}
+            {/* Device type badge */}
+            <span style={{
+              marginLeft: '8px', fontSize: '0.65rem', fontWeight: 600,
+              padding: '2px 6px', borderRadius: '4px',
+              background: DEVICE_TYPE_COLORS[device.device_type] || '#71717a',
+              color: '#fff', letterSpacing: '0.03em', verticalAlign: 'middle',
+            }}>
+              {DEVICE_TYPE_LABELS[device.device_type] || device.device_type || 'eSIM Node'}
+            </span>
+          </div>
+          <div className="device-id">{device.device_id}</div>
+        </div>
+        <span className={`device-status ${device.is_online ? 'status-online' : 'status-offline'}`}>
+          {device.is_online ? 'Online' : 'Offline'}
+        </span>
+      </div>
+
+      <div className="device-metrics">
+        <div className="metric-item">
+          <span className="metric-label">Battery</span>
+          <span className={`metric-value ${batteryClass(device.battery_pct)}`}>
+            {device.battery_pct != null ? `${device.battery_pct}%` : '—'}
+            {device.battery_mv  != null ? ` · ${(device.battery_mv/1000).toFixed(2)}V` : ''}
+          </span>
+        </div>
+        <div className="metric-item">
+          <span className="metric-label">Signal</span>
+          <span className={`metric-value ${signalClass(device.signal_label)}`}>
+            {device.rssi_dbm != null ? `${device.rssi_dbm} dBm` : '—'}
+          </span>
+        </div>
+        <div className="metric-item">
+          <span className="metric-label">Last Seen</span>
+          <span className="metric-value">{timeAgo(device.last_seen)}</span>
+        </div>
+        <div className="metric-item">
+          <span className="metric-label">Config</span>
+          <span className="metric-value">
+            v{device.cfg_version ?? 0}
+            {device.config_applied
+              ? <> · <span style={{color:'#16a34a',fontSize:'0.72rem'}}>Applied</span></>
+              : device.cfg_version > 0
+                ? <> · <span style={{color:'#ea580c',fontSize:'0.72rem'}}>Pending</span></>
+                : null}
+          </span>
+        </div>
+      </div>
+
+      <div className="device-footer">
+        <span className="device-location">{device.location}</span>
+        <span className="device-sensor">{SENSOR_LABELS[device.sensor_type] || device.sensor_type}</span>
+        {device.device_type === 'sensor_node' && device.lora_addr != null && (
+          <span style={{ fontSize: '0.72rem', color: '#71717a' }}>LoRa addr: 0x{device.lora_addr.toString(16).toUpperCase().padStart(2,'0')}</span>
+        )}
+        <button
+          className="btn-configure"
+          onClick={e => { e.stopPropagation(); navigate(`/devices/${device.device_id}/config`); }}
+        >
+          Configure
+        </button>
+      </div>
+    </div>
+  );
+
   // ── Render ────────────────────────────────────────────────────────────
   return (
     <div className="devices-page">
@@ -144,6 +260,14 @@ export default function Devices() {
         <span>{devices.length} devices registered</span>
         <span className="stat-sep">·</span>
         <span className="stat-online">{onlineCount} online</span>
+        {gateways.length > 0 && (
+          <><span className="stat-sep">·</span>
+          <span style={{ color: '#7c3aed', fontWeight: 500 }}>{gateways.length} LoRa {gateways.length === 1 ? 'gateway' : 'gateways'}</span></>
+        )}
+        {sensorNodes.length > 0 && (
+          <><span className="stat-sep">·</span>
+          <span style={{ color: '#15803d', fontWeight: 500 }}>{sensorNodes.length} LoRa {sensorNodes.length === 1 ? 'node' : 'nodes'}</span></>
+        )}
       </div>
 
       {/* Register modal */}
@@ -158,7 +282,7 @@ export default function Devices() {
               <div className="modal-field">
                 <label>Device ID (from firmware)</label>
                 <input
-                  required placeholder="e.g. SNR001"
+                  required placeholder="e.g. GW001 or D001"
                   value={newDevice.device_id}
                   onChange={e => setNewDevice(p => ({ ...p, device_id: e.target.value.toUpperCase() }))}
                 />
@@ -181,6 +305,52 @@ export default function Devices() {
                   onChange={e => setNewDevice(p => ({ ...p, location: e.target.value.toLowerCase() }))}
                 />
               </div>
+
+              <div className="modal-field">
+                <label>Device Type</label>
+                <select
+                  value={newDevice.device_type}
+                  onChange={e => setNewDevice(p => ({ ...p, device_type: e.target.value, gateway_device_id: '', lora_addr: '' }))}
+                >
+                  <option value="direct_esim">eSIM Node (direct cellular — old architecture)</option>
+                  <option value="gateway">LoRa Gateway (eSIM + LoRa receiver)</option>
+                  <option value="sensor_node">LoRa Sensor Node (no SIM — sends via gateway)</option>
+                </select>
+              </div>
+
+              {/* LoRa-specific fields — only for sensor_node */}
+              {newDevice.device_type === 'sensor_node' && (
+                <>
+                  <div className="modal-field">
+                    <label>Parent Gateway Device ID</label>
+                    <select
+                      value={newDevice.gateway_device_id}
+                      onChange={e => setNewDevice(p => ({ ...p, gateway_device_id: e.target.value }))}
+                    >
+                      <option value="">— Select Gateway —</option>
+                      {gateways.map(g => (
+                        <option key={g.device_id} value={g.device_id}>
+                          {g.device_id}{g.name ? ` — ${g.name}` : ''} ({g.location})
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: '#a1a1aa', fontSize: '0.75rem' }}>
+                      The LoRa gateway that relays this node's packets to MQTT.
+                    </small>
+                  </div>
+                  <div className="modal-field">
+                    <label>LoRa Address Byte (decimal — e.g. 1 for 0x01)</label>
+                    <input
+                      type="number" min="1" max="254" placeholder="e.g. 1"
+                      value={newDevice.lora_addr}
+                      onChange={e => setNewDevice(p => ({ ...p, lora_addr: e.target.value }))}
+                    />
+                    <small style={{ color: '#a1a1aa', fontSize: '0.75rem' }}>
+                      Must match the source address byte in the node's LoRa packet header.
+                    </small>
+                  </div>
+                </>
+              )}
 
               <div className="modal-field">
                 <label>Initial Sensor Type</label>
@@ -211,67 +381,33 @@ export default function Devices() {
       {loading && <div className="devices-loading">Loading devices...</div>}
       {error   && <div className="devices-error">{error}</div>}
 
-      {/* Device grid */}
+      {/* Device grid — grouped by type */}
       {!loading && devices.length > 0 && (
         <div className="devices-grid">
-          {devices.map(device => (
-            <div
-              key={device.device_id}
-              className={`device-card ${device.is_online ? 'online' : 'offline'}`}
-              onClick={() => navigate(`/devices/${device.device_id}/config`)}
-            >
-              <div className="device-card-header">
-                <div>
-                  <div className="device-name">{device.name || device.device_id}</div>
-                  <div className="device-id">{device.device_id}</div>
-                </div>
-                <span className={`device-status ${device.is_online ? 'status-online' : 'status-offline'}`}>
-                  {device.is_online ? 'Online' : 'Offline'}
-                </span>
-              </div>
 
-              <div className="device-metrics">
-                <div className="metric-item">
-                  <span className="metric-label">Battery</span>
-                  <span className={`metric-value ${batteryClass(device.battery_pct)}`}>
-                    {device.battery_pct != null ? `${device.battery_pct}%` : '—'}
-                    {device.battery_mv  != null ? ` · ${(device.battery_mv/1000).toFixed(2)}V` : ''}
-                  </span>
-                </div>
-                <div className="metric-item">
-                  <span className="metric-label">Signal</span>
-                  <span className={`metric-value ${signalClass(device.signal_label)}`}>
-                    {device.rssi_dbm != null ? `${device.rssi_dbm} dBm` : '—'}
-                  </span>
-                </div>
-                <div className="metric-item">
-                  <span className="metric-label">Last Seen</span>
-                  <span className="metric-value">{timeAgo(device.last_seen)}</span>
-                </div>
-                <div className="metric-item">
-                  <span className="metric-label">Config</span>
-                  <span className="metric-value">
-                    v{device.cfg_version ?? 0}
-                    {device.config_applied
-                      ? <> · <span style={{color:'#16a34a',fontSize:'0.72rem'}}>Applied</span></>
-                      : device.cfg_version > 0
-                        ? <> · <span style={{color:'#ea580c',fontSize:'0.72rem'}}>Pending</span></>
-                        : null}
-                  </span>
-                </div>
-              </div>
-
-              <div className="device-footer">
-                <span className="device-location">{device.location}</span>
-                <span className="device-sensor">{SENSOR_LABELS[device.sensor_type] || device.sensor_type}</span>
-                <button
-                  className="btn-configure"
-                  onClick={e => { e.stopPropagation(); navigate(`/devices/${device.device_id}/config`); }}
-                >
-                  Configure
-                </button>
-              </div>
+          {/* LoRa Gateways with their sensor nodes nested underneath */}
+          {gateways.map(gw => (
+            <div key={gw.device_id} style={{ gridColumn: '1 / -1' }}>
+              <DeviceCard device={gw} />
+              {sensorNodes.filter(n => n.gateway_device_id === gw.device_id).map(node => (
+                <DeviceCard key={node.device_id} device={node} compact />
+              ))}
             </div>
+          ))}
+
+          {/* Ungrouped LoRa sensor nodes (gateway not yet registered) */}
+          {ungroupedNodes.map(node => (
+            <div key={node.device_id}>
+              <div style={{ fontSize: '0.7rem', color: '#f59e0b', marginBottom: '4px', fontWeight: 600 }}>
+                ⚠ Gateway "{node.gateway_device_id || 'unknown'}" not registered
+              </div>
+              <DeviceCard device={node} />
+            </div>
+          ))}
+
+          {/* Direct eSIM nodes (old / legacy architecture) */}
+          {directEsim.map(device => (
+            <DeviceCard key={device.device_id} device={device} />
           ))}
         </div>
       )}

@@ -27,6 +27,14 @@ function Dashboard({
   exportToCSV,
   historicalData
 }) {
+  // Bug Fix 3b: When a location is selected, only show devices at that location.
+  // We derive this from `data` (all readings, pre location-filter) not from `filteredData`
+  // (which is already location-filtered, so all its device ids are at that location).
+  // This gives instant client-side cascade without a new API call.
+  const filteredDeviceIds = selectedLocation
+    ? [...new Set(data.filter(r => r.gateway_id === selectedLocation).map(r => r.node_id))]
+    : deviceIds;
+
   return (
     <>
       {error && (
@@ -73,10 +81,10 @@ function Dashboard({
             <select
               value={selectedDevice}
               onChange={e => setSelectedDevice(e.target.value)}
-              disabled={deviceIds.length === 0}
+              disabled={filteredDeviceIds.length === 0}
             >
               <option value="">All Devices</option>
-              {deviceIds.map(id => <option key={id} value={id}>{id}</option>)}
+              {filteredDeviceIds.map(id => <option key={id} value={id}>{id}</option>)}
             </select>
           </div>
 
@@ -94,7 +102,7 @@ function Dashboard({
 
         <div className="controls-row">
           <div className="control-actions">
-            <button onClick={fetchData} className="btn btn-primary" disabled={loading}>
+            <button onClick={() => fetchData(timeRange)} className="btn btn-primary" disabled={loading}>
               {loading ? 'Loading...' : 'Refresh'}
             </button>
             <button onClick={resetFilters} className="btn btn-secondary">

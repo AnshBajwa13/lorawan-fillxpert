@@ -47,6 +47,9 @@ function App() {
   // WebSocket ref
   const wsRef = useRef(null);
   const wsRetryRef = useRef(null);
+  // Negative counter for WebSocket-only temp IDs (avoids collision with real DB ids)
+  // Real DB ids are positive integers; WS temp ids count down: -1, -2, -3 ...
+  const wsIdCounterRef = useRef(0);
 
   // ── Axios interceptor (auth token) ────────────────────────────────────
   useEffect(() => {
@@ -100,9 +103,10 @@ function App() {
     return history;
   }, []);
 
-  // ── Data fetch — server-side time range filtering ───────────────────────────
+  // ── Data fetch — server-side time range filtering ─────────────────────────────────────────────
   // hoursParam: number of hours to fetch, or 'all' for everything
-  // The backend already supports ?hours=N&limit=N — we just weren't using it!
+  // Filter options (/api/gateways, /api/nodes) are fetched from dedicated endpoints
+  // so they are NEVER empty even when the time-range returns 0 readings.
   const fetchData = useCallback(async (hoursParam) => {
     try {
       setLoading(true);
@@ -115,9 +119,14 @@ function App() {
       const h = hoursParam !== undefined ? hoursParam : timeRange;
       if (h && h !== 'all') params.hours = parseInt(h) || 24;
 
-      const [readingsRes, statsRes] = await Promise.all([
+      // Bug Fix 2: Fetch filter options from dedicated API endpoints—independent of time range.
+      // /api/gateways returns ALL locations ever seen; /api/nodes returns ALL device ids.
+      // This ensures dropdowns are NEVER empty even when the data query returns 0 rows.
+      const [readingsRes, statsRes, locRes, devRes] = await Promise.all([
         axios.get(`${API_URL}/api/sensor-data`, { params }),
         axios.get(`${API_URL}/api/stats`),
+        axios.get(`${API_URL}/api/gateways`),
+        axios.get(`${API_URL}/api/nodes`),
       ]);
 
       const readings = readingsRes.data;
@@ -125,9 +134,9 @@ function App() {
       setStats(statsRes.data);
       setHistoricalData(buildHistoricalData(readings));
 
-      // Extract unique location/device values (gateway_id = location, node_id = device)
-      setLocations([...new Set(readings.map(r => r.gateway_id))]);
-      setDeviceIds([...new Set(readings.map(r => r.node_id))]);
+      // Filter options come from dedicated endpoints — always complete
+      setLocations(locRes.data || []);
+      setDeviceIds(devRes.data || []);
 
       setApiStatus('connected');
       setLastUpdate(new Date());
@@ -168,11 +177,17 @@ function App() {
         const msg = JSON.parse(evt.data);
 
         if (msg.event === 'new_reading') {
-          const { device_id, location, timestamp, readings: vals, battery_mv } = msg;
+          const { reading_id, device_id, location, timestamp, readings: vals, battery_mv } = msg;
+
+          // Bug Fix 1: Use the real DB id from the WS payload (backend now sends reading_id).
+          // Falls back to a negative temp counter if the reading wasn't saved (unknown device / dup).
+          // Negative ids are visually distinct from real DB ids (positive integers).
+          wsIdCounterRef.current -= 1;
+          const stableId = reading_id ?? wsIdCounterRef.current;
 
           // Build a pseudo-reading row matching the REST API shape
           const newReading = {
-            id: Date.now(),        // temp id for key
+            id: stableId,
             gateway_id: location,          // location = gateway_id in DB
             node_id: device_id,
             timestamp: timestamp,
@@ -181,7 +196,7 @@ function App() {
             temperature: vals?.temperature ?? null,
             battery_voltage: battery_mv ? battery_mv / 1000 : null,
             measurements: vals,
-            trigger: msg.trigger || 'schedule', // Fix: correctly pass trigger from WS payload
+            trigger: msg.trigger || 'schedule',
             _live: true,              // flag for optional "LIVE" badge in table
             _calibration: msg.trigger === 'manual', // calibration mode reading
           };
@@ -209,6 +224,8 @@ function App() {
           });
 
           // Update location/device filter lists if new
+          // These are additive-only: adding new locations/devices seen in live readings.
+          // The initial list was fetched from /api/gateways & /api/nodes on load.
           setLocations(prev => prev.includes(location) ? prev : [...prev, location]);
           setDeviceIds(prev => prev.includes(device_id) ? prev : [...prev, device_id]);
           setLastUpdate(new Date());
@@ -355,7 +372,7 @@ function App() {
                     Last: {lastUpdate.toLocaleTimeString()}
                   </span>
                 )}
-                <button className="btn btn-secondary" onClick={fetchData} disabled={loading} style={{ padding: '5px 12px', fontSize: '0.8rem' }}>
+                <button className="btn btn-secondary" onClick={() => fetchData(timeRange)} disabled={loading} style={{ padding: '5px 12px', fontSize: '0.8rem' }}>
                   {loading ? '...' : 'Refresh'}
                 </button>
               </div>

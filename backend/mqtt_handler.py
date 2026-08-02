@@ -42,6 +42,10 @@ STANDARD_V_KEYS = {
     "tp": "temperature",   # temperature ('tp' not 't' to avoid clash with transmitter id)
 }
 
+# v{} keys sent as raw values, NOT encoded as int × 10 like the rest of v{}.
+# e.g. ultrasonic "dist" — sent as literal millimeters.
+RAW_V_KEYS = {"dist"}
+
 
 # ---------------------------------------------------------------------------
 # Message parsers
@@ -74,20 +78,28 @@ def _parse_telemetry(topic_parts: list[str], raw: str) -> dict | None:
     if len(topic_parts) < 2:
         return None
 
-    location  = topic_parts[0]
-    device_id = topic_parts[1]
+    location = topic_parts[0]
+    # Device identity: prefer payload "t" (transmitter id) — required when a gateway
+    # relays multiple LoRa nodes on one shared topic (topic segment is the gateway,
+    # not the node). Falls back to the topic segment for legacy direct-eSIM devices,
+    # which publish one topic per device and never send "t".
+    device_id = payload.get("t") or topic_parts[1]
 
     # Sensor type: int or string code → name
     s_raw = str(payload.get("s", "1")).zfill(2)
     sensor_type = SENSOR_TYPE_MAP.get(s_raw, "unknown")
 
-    # Readings dict — divide each int value by 10 to get float
+    # Readings dict — divide each int value by 10 to get float, EXCEPT keys in
+    # RAW_V_KEYS which firmware sends as-is (e.g. ultrasonic "dist" in raw mm).
     v_raw: dict = payload.get("v", {})
     standard_cols = {}
     extra_measurements = {}
 
     for key, int_val in v_raw.items():
-        float_val = round(int_val / 10, 2) if isinstance(int_val, (int, float)) else int_val
+        if key in RAW_V_KEYS:
+            float_val = int_val
+        else:
+            float_val = round(int_val / 10, 2) if isinstance(int_val, (int, float)) else int_val
         col_name = STANDARD_V_KEYS.get(key)
         if col_name:
             standard_cols[col_name] = float_val
@@ -114,7 +126,8 @@ def _parse_telemetry(topic_parts: list[str], raw: str) -> dict | None:
         "extra":       extra_measurements,  # npk, ph, etc. → measurements JSON
         "battery_mv":  battery_mv,
         "battery_v":   battery_v,
-        "rssi_dbm":    payload.get("r"),
+        "rssi_dbm":    payload.get("r"),   # GSM/cellular signal (existing)
+        "lora_rssi":   payload.get("lr"),  # LoRa radio signal node↔gateway (new — optional)
         "trigger":     payload.get("trigger", "schedule"),
         "attempts":    payload.get("a", 1),
         "msg_id":      payload.get("mid"),
@@ -193,11 +206,13 @@ def _save_telemetry(data: dict) -> SensorReading | None:
             temperature     = data["standard"].get("temperature"),
             battery_voltage = data.get("battery_v"),
             measurements    = measurements,
-            # New columns (will exist after migration)
+            # MQTT / telemetry fields
             msg_id          = data.get("msg_id"),
             rssi_dbm        = data.get("rssi_dbm"),
             trigger         = data.get("trigger"),
             cfg_ver         = data.get("cfg_ver"),
+            # LoRa gateway architecture — LoRa radio RSSI (node↔gateway link)
+            lora_rssi       = data.get("lora_rssi"),
         )
         db.add(reading)
         db.commit()
@@ -359,6 +374,7 @@ async def _dispatch(topic_parts: list[str], payload_str: str):
         # Broadcast to all open browser WebSocket connections
         ws_payload = {
             "event":      "new_reading",
+            "reading_id": reading.id if reading is not None else None,  # real DB id (fixes Date.now() bug)
             "device_id":  data["device_id"],
             "location":   data["location"],
             "sensor_type":data["sensor_type"],
@@ -367,6 +383,7 @@ async def _dispatch(topic_parts: list[str], payload_str: str):
             "battery_mv": data.get("battery_mv"),
             "battery_pct":_mv_to_pct(data.get("battery_mv")),
             "rssi_dbm":   data.get("rssi_dbm"),
+            "lora_rssi":  data.get("lora_rssi"),   # LoRa signal quality (node↔gateway), may be null
             "signal":     _rssi_label(data.get("rssi_dbm")),
             "trigger":    data.get("trigger", "schedule"),
             "saved":      reading is not None,

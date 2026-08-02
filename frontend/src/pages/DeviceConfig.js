@@ -99,7 +99,10 @@ export default function DeviceConfig() {
     const codes = { moisture:'01', temperature:'02', npk:'03', ph:'04', ultrasonic:'05', humidity:'06' };
     const code     = codes[sensorType] || '01';
     const freqStr  = String(freq).padStart(2, '0');
-    const nextVer  = String((device?.cfg_version || 0) + 1).padStart(2, '0');
+    // Mirror backend: cycle 01-99 so payload version is ALWAYS exactly 2 chars
+    const dbNextVer = (device?.cfg_version || 0) + 1;
+    const payloadVer = ((dbNextVer - 1) % 99) + 1;
+    const nextVer  = String(payloadVer).padStart(2, '0');
     let slots = '';
     for (let i = 0; i < freq; i++) {
       const [h, m] = times[i].split(':');

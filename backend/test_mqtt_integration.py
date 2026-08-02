@@ -714,7 +714,203 @@ def print_summary():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ENTRY POINT
+# ENTRY POINT (original 6 tests + 3 new LoRa tests — see below main())
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST 7 — LoRa RSSI stored in DB
+# ─────────────────────────────────────────────────────────────────────────────
+async def test_lora_rssi_field():
+    """
+    TEST 7 — LoRa RSSI field
+    Publishes a payload with "lr": -85 (LoRa radio signal node↔gateway).
+    Verifies sensor_readings.lora_rssi = -85 is stored in DB.
+    """
+    print(f"\n{BOLD}{'─'*60}{RESET}")
+    print(f"{STEP} TEST 7 — LoRa RSSI field")
+    print(f"{'─'*60}")
+
+    lora_msg_id = f"lora-test-{uuid.uuid4().hex[:8]}"
+    topic = f"{TEST_LOCATION}/{TEST_DEVICE_ID}/telemetry"
+
+    payload = {
+        "t":   TEST_DEVICE_ID,
+        "ts":  int(time.time()),
+        "s":   1,
+        "v":   {"m": 500},
+        "b":   380,
+        "r":   -70,
+        "lr":  -85,        # ← LoRa radio signal node↔gateway
+        "a":   1,
+        "mid": lora_msg_id,
+    }
+
+    print(f"  {INFO} Publishing with LoRa RSSI (lr=-85)...")
+    await mqtt_publish(topic, payload)
+    await asyncio.sleep(3)
+
+    # Verify lora_rssi stored in DB
+    row = db_query_one(
+        "SELECT lora_rssi, rssi_dbm FROM sensor_readings WHERE msg_id = %s",
+        (lora_msg_id,)
+    )
+    if row is None:
+        record("TEST 7 — LoRa RSSI: row in DB", False, "Row not found (msg_id lookup)")
+        return
+
+    record("TEST 7 — LoRa RSSI: row in DB", True)
+    record(
+        "TEST 7 — LoRa RSSI: lora_rssi = -85",
+        row.get("lora_rssi") == -85,
+        f"Got lora_rssi={row.get('lora_rssi')}"
+    )
+    record(
+        "TEST 7 — LoRa RSSI: rssi_dbm separate (-70)",
+        row.get("rssi_dbm") == -70,
+        f"Got rssi_dbm={row.get('rssi_dbm')}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST 8 — reading_id in WebSocket broadcast (Dashboard ID bug fix)
+# ─────────────────────────────────────────────────────────────────────────────
+async def test_ws_reading_id():
+    """
+    TEST 8 — reading_id in WebSocket broadcast
+    Connects a WebSocket client BEFORE publishing telemetry.
+    Verifies the new_reading WS event includes 'reading_id' as a positive integer
+    (not a 13-digit Date.now() epoch like 1785668869320).
+    """
+    print(f"\n{BOLD}{'─'*60}{RESET}")
+    print(f"{STEP} TEST 8 — WebSocket reading_id (dashboard ID bug fix)")
+    print(f"{'─'*60}")
+
+    try:
+        import websockets
+    except ImportError:
+        print(f"  {WARN} websockets not installed — skipping TEST 8")
+        record("TEST 8 — WS reading_id", False, "websockets not installed")
+        return
+
+    # Use a unique msg_id so we can match to DB later
+    ws_msg_id = f"wsid-test-{uuid.uuid4().hex[:8]}"
+    topic = f"{TEST_LOCATION}/{TEST_DEVICE_ID}/telemetry"
+    payload = {
+        "t": TEST_DEVICE_ID, "ts": int(time.time()),
+        "s": 1, "v": {"m": 440}, "b": 375, "r": -68,
+        "a": 1, "mid": ws_msg_id,
+    }
+
+    received_events = []
+    ws_done = asyncio.Event()
+
+    token_param = ""   # WS_URL may include ?token= if auth is required; adjust as needed
+
+    async def ws_listener():
+        try:
+            async with websockets.connect(WS_URL + token_param, close_timeout=5) as ws:
+                print(f"  {INFO} WebSocket connected")
+                ws_done_inner = asyncio.get_event_loop().call_later(6, ws_done.set)
+                try:
+                    while not ws_done.is_set():
+                        try:
+                            msg = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                            data = json.loads(msg)
+                            if data.get("event") == "new_reading":
+                                received_events.append(data)
+                        except asyncio.TimeoutError:
+                            continue
+                except Exception:
+                    pass
+                ws_done_inner.cancel()
+        except Exception as e:
+            print(f"  {WARN} WS connection error: {e}")
+            ws_done.set()
+
+    # Start listener, wait for it to connect, then publish
+    listener_task = asyncio.create_task(ws_listener())
+    await asyncio.sleep(1.5)   # give WS time to connect
+
+    print(f"  {INFO} Publishing telemetry with msg_id={ws_msg_id}...")
+    await mqtt_publish(topic, payload)
+    await asyncio.sleep(4)     # give backend time to process + broadcast
+    ws_done.set()
+    await listener_task
+
+    # Find the event for our msg_id
+    matching = [e for e in received_events
+                if e.get("msg_id") == ws_msg_id or e.get("device_id") == TEST_DEVICE_ID]
+    if not matching:
+        print(f"  {WARN} No matching WS event received (got {len(received_events)} total)")
+        record("TEST 8 — WS event received", False, "No new_reading event for our publish")
+        return
+
+    event = matching[-1]
+    record("TEST 8 — WS new_reading event received", True)
+
+    reading_id = event.get("reading_id")
+    is_positive_int = isinstance(reading_id, int) and reading_id > 0
+    is_not_epoch    = reading_id is None or reading_id < 1_000_000_000_000  # < 13 digits
+
+    record(
+        "TEST 8 — reading_id is positive integer (not Date.now())",
+        is_positive_int,
+        f"reading_id={reading_id}"
+    )
+    record(
+        "TEST 8 — reading_id not a 13-digit epoch timestamp",
+        is_not_epoch,
+        f"reading_id={reading_id}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TEST 9 — device_type stored and returned by API
+# ─────────────────────────────────────────────────────────────────────────────
+async def test_device_type_registration():
+    """
+    TEST 9 — Gateway device_type in DB
+    Checks the devices table for the TEST_DEVICE_ID and verifies
+    its device_type column is a valid value (not NULL or garbage).
+
+    Note: the device must have been registered in the dashboard first
+    (the preflight_check() ensures this). This test only verifies the new column.
+    """
+    print(f"\n{BOLD}{'─'*60}{RESET}")
+    print(f"{STEP} TEST 9 — device_type column in DB")
+    print(f"{'─'*60}")
+
+    row = db_query_one(
+        "SELECT device_id, device_type, gateway_device_id, lora_addr "
+        "FROM devices WHERE device_id = %s",
+        (TEST_DEVICE_ID,)
+    )
+
+    if row is None:
+        record("TEST 9 — device row in DB", False,
+               f"Device {TEST_DEVICE_ID} not found in devices table")
+        return
+
+    record("TEST 9 — device row in DB", True)
+
+    valid_types = {"gateway", "sensor_node", "direct_esim"}
+    device_type = row.get("device_type")
+    record(
+        "TEST 9 — device_type is a valid value",
+        device_type in valid_types,
+        f"device_type='{device_type}' (valid: {sorted(valid_types)})"
+    )
+    record(
+        "TEST 9 — device_type column exists (not NULL)",
+        device_type is not None,
+        f"device_type={device_type}"
+    )
+    print(f"  {INFO} gateway_device_id = {row.get('gateway_device_id')}")
+    print(f"  {INFO} lora_addr         = {row.get('lora_addr')}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main runner
 # ─────────────────────────────────────────────────────────────────────────────
 async def main():
     print(f"""
@@ -734,13 +930,21 @@ async def main():
     if not ok:
         sys.exit(1)
 
-    # Run all tests sequentially
+    # ── Original 6 tests ──────────────────────────────────────────────────
     await test_telemetry_flow()
     await test_duplicate_detection()
     await test_config_ack()
     await test_device_status()
     await test_websocket_event()
     await test_cleanup()
+
+    # ── New 3 tests — LoRa gateway architecture ───────────────────────────
+    print(f"\n{BOLD}{'═'*60}{RESET}")
+    print(f"{BOLD}  LoRa Gateway Architecture Tests (NEW){RESET}")
+    print(f"{'═'*60}")
+    await test_lora_rssi_field()
+    await test_ws_reading_id()
+    await test_device_type_registration()
 
     print_summary()
 

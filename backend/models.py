@@ -26,7 +26,8 @@ class SensorReading(Base):
 
     # MQTT-specific fields (added for device telemetry)
     msg_id   = Column(String(24), nullable=True)    # dedup: unique per message (indexed below)
-    rssi_dbm = Column(Integer,    nullable=True)     # GSM signal strength dBm
+    rssi_dbm = Column(Integer,    nullable=True)     # GSM/cellular signal strength dBm (gateway↔cloud)
+    lora_rssi= Column(Integer,    nullable=True)     # LoRa radio signal dBm (node↔gateway) — null for direct eSIM nodes
     trigger  = Column(String(20), nullable=True)     # schedule / manual / buffered
     cfg_ver  = Column(Integer,    nullable=True)     # config version active on device
 
@@ -57,7 +58,8 @@ class SensorReading(Base):
             "battery_voltage": self.battery_voltage,
             # MQTT fields — must be returned so dashboard can display them
             "trigger":  self.trigger,    # "schedule" / "button" / "manual"
-            "rssi_dbm": self.rssi_dbm,   # signal strength dBm
+            "rssi_dbm": self.rssi_dbm,   # GSM/cellular signal (gateway↔cloud)
+            "lora_rssi":self.lora_rssi,  # LoRa radio signal (node↔gateway); null for direct eSIM
             "cfg_ver":  self.cfg_ver,    # config version device was running
             "msg_id":   self.msg_id,     # dedup key
             "created_at": utc(self.created_at),

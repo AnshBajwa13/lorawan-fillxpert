@@ -291,7 +291,7 @@ function Register() {
       <div className="register-info">
         <div className="info-content">
           <h2>Start Monitoring Your IoT Network</h2>
-          <p>Get started with Sensorvault — a comprehensive platform for IoT sensor data collection and field monitoring.</p>
+          <p>Get started with SensorVault — a comprehensive platform for IoT sensor data collection and field monitoring.</p>
 
           <div className="benefits-list">
             <div className="benefit-item">

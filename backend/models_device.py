@@ -62,6 +62,15 @@ class Device(Base):
     battery_mv  = Column(Integer,  nullable=True)  # millivolts e.g. 3750
     rssi_dbm    = Column(Integer,  nullable=True)  # e.g. -71
 
+    # LoRa Gateway Architecture (new — null for legacy direct-eSIM nodes)
+    # device_type: "gateway" | "sensor_node" | "direct_esim" (default)
+    device_type       = Column(String(20),  nullable=False, default="direct_esim")
+    # For sensor_node devices: which gateway do they send LoRa packets through?
+    gateway_device_id = Column(String(50),  ForeignKey("devices.device_id", ondelete="SET NULL"),
+                               nullable=True)
+    # LoRa address byte used by this node in its radio packets (e.g. 1 = 0x01 = "D001")
+    lora_addr         = Column(Integer,     nullable=True)
+
     created_at  = Column(DateTime, server_default=func.now())
     updated_at  = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -82,6 +91,10 @@ class Device(Base):
             "battery_pct":       _mv_to_pct(self.battery_mv),
             "rssi_dbm":          self.rssi_dbm,
             "signal_label":      _rssi_label(self.rssi_dbm),
+            # LoRa gateway architecture fields
+            "device_type":       self.device_type,        # "gateway" | "sensor_node" | "direct_esim"
+            "gateway_device_id": self.gateway_device_id,  # parent gateway id (sensor_node only)
+            "lora_addr":         self.lora_addr,          # LoRa packet source address byte
             "created_at":        self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -200,5 +213,9 @@ def build_config_payload(sensor_type: str, freq: int,
             parts.append("0000")   # fallback: 00:00 if slot missing
         else:
             parts.append(f"{h:02d}{m:02d}")
-    parts.append(f"{cfg_ver:02d}")  # always last 2 chars — version stamp
+    # Cycle 01–99 so payload is ALWAYS exactly 2 chars.
+    # DB stores the real integer (can be 100, 200...) for history.
+    # Firmware only checks "has version changed?" not the absolute number.
+    payload_ver = ((cfg_ver - 1) % 99) + 1
+    parts.append(f"{payload_ver:02d}")  # always last 2 chars — version stamp
     return "".join(parts)
