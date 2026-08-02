@@ -276,29 +276,31 @@ export default function Devices() {
         {device.device_type === 'sensor_node' && device.lora_addr != null && (
           <span style={{ fontSize: '0.72rem', color: '#71717a' }}>LoRa addr: 0x{device.lora_addr.toString(16).toUpperCase().padStart(2,'0')}</span>
         )}
-        <button
-          className="btn-configure"
-          onClick={e => { e.stopPropagation(); navigate(`/devices/${device.device_id}/config`); }}
-        >
-          Configure
-        </button>
-        <button
-          className="btn-configure"
-          style={{ color: '#dc2626', borderColor: '#dc2626' }}
-          disabled={deletingId === device.device_id}
-          onClick={e => { e.stopPropagation(); handleDeleteDevice(device); }}
-        >
-          {deletingId === device.device_id ? 'Deleting…' : 'Delete'}
-        </button>
-        <button
-          className="btn-configure"
-          style={{ color: '#991b1b', borderColor: '#991b1b' }}
-          disabled={deletingId === device.device_id}
-          onClick={e => { e.stopPropagation(); handleDeleteReadings(device); }}
-          title="Permanently delete all historical readings for this device"
-        >
-          Delete Readings
-        </button>
+        <div className="device-actions">
+          <button
+            className="btn-configure"
+            onClick={e => { e.stopPropagation(); navigate(`/devices/${device.device_id}/config`); }}
+          >
+            Configure
+          </button>
+          <button
+            className="btn-configure"
+            style={{ color: '#dc2626', borderColor: '#dc2626' }}
+            disabled={deletingId === device.device_id}
+            onClick={e => { e.stopPropagation(); handleDeleteDevice(device); }}
+          >
+            {deletingId === device.device_id ? 'Deleting…' : 'Delete'}
+          </button>
+          <button
+            className="btn-configure"
+            style={{ color: '#991b1b', borderColor: '#991b1b' }}
+            disabled={deletingId === device.device_id}
+            onClick={e => { e.stopPropagation(); handleDeleteReadings(device); }}
+            title="Permanently delete all historical readings for this device"
+          >
+            Delete Readings
+          </button>
+        </div>
       </div>
     </div>
   );

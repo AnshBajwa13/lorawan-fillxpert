@@ -79,16 +79,20 @@
 .metric-value.muted  { color: #a1a1aa; }
 
 .device-footer {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 8px;
   padding-top: 12px; border-top: 1px solid #f4f4f5;
 }
 .device-location { font-size: 0.78rem; color: #71717a; }
 .device-sensor   { font-size: 0.78rem; color: #52525b; font-weight: 500; background: #f4f4f5; padding: 3px 8px; border-radius: 4px; }
 
+.device-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+
 .btn-configure {
   padding: 6px 14px; background: #fff; color: #18181b;
   border: 1px solid #e4e4e7; border-radius: 6px;
   font-size: 0.78rem; font-weight: 500; cursor: pointer;
+  white-space: nowrap;
   transition: all 0.18s;
 }
 .btn-configure:hover { background: #18181b; color: #fff; border-color: #18181b; }
