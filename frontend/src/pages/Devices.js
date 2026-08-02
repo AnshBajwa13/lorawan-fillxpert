@@ -39,6 +39,7 @@ export default function Devices() {
     device_type: 'direct_esim', gateway_device_id: '', lora_addr: '',
   });
   const [adding, setAdding]       = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   const wsRef                     = useRef(null);
   const navigate                  = useNavigate();
 
@@ -127,6 +128,26 @@ export default function Devices() {
       setAddError(err.response?.data?.detail || 'Failed to register device.');
     } finally {
       setAdding(false);
+    }
+  };
+
+  // ── Delete device (registry only — historical readings are kept) ───────
+  const handleDeleteDevice = async (device) => {
+    const confirmed = window.confirm(
+      `Delete "${device.name || device.device_id}" (${device.device_id})?\n\n` +
+      `This removes it from your device list. Its past readings are NOT deleted ` +
+      `and will still appear in the Dashboard and exports.`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(device.device_id);
+    try {
+      await axios.delete(`${API_URL}/api/devices/${device.device_id}`);
+      setDevices(prev => prev.filter(d => d.device_id !== device.device_id));
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to delete device.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -235,6 +256,14 @@ export default function Devices() {
           onClick={e => { e.stopPropagation(); navigate(`/devices/${device.device_id}/config`); }}
         >
           Configure
+        </button>
+        <button
+          className="btn-configure"
+          style={{ color: '#dc2626', borderColor: '#dc2626' }}
+          disabled={deletingId === device.device_id}
+          onClick={e => { e.stopPropagation(); handleDeleteDevice(device); }}
+        >
+          {deletingId === device.device_id ? 'Deleting…' : 'Delete'}
         </button>
       </div>
     </div>
