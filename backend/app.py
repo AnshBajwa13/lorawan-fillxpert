@@ -118,7 +118,7 @@ async def root():
     """Health check — returns service name and version"""
     return {
         "status": "online",
-        "service": "FillXpert Data Collection API",
+        "service": "SensorVault Data Collection API",
         "version": "2.1.0"
     }
 

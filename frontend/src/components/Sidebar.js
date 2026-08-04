@@ -93,7 +93,7 @@ function Sidebar({ isOpen, onClose, currentUser }) {
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            {isOpen && <span className="logo-text">FillXpert</span>}
+            {isOpen && <span className="logo-text">SensorVault</span>}
           </div>
           {isOpen && (
             <button className="sidebar-close" onClick={onClose}>
@@ -145,7 +145,7 @@ function Sidebar({ isOpen, onClose, currentUser }) {
             {isOpen && (
               <div className="user-info">
                 <div className="user-name">{currentUser?.full_name || currentUser?.username || 'Admin User'}</div>
-                <div className="user-email">{currentUser?.email || 'admin@fillxpert.io'}</div>
+                <div className="user-email">{currentUser?.email || 'admin@sensorvault.io'}</div>
               </div>
             )}
           </div>

@@ -311,7 +311,7 @@ function App() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `fillxpert-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `sensorvault-export-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
