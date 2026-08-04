@@ -56,7 +56,13 @@ class SensorReadingOutput(BaseModel):
     temperature: Optional[float]
     battery_voltage: Optional[float]
     measurements: Optional[Dict[str, Any]]
-    created_at: datetime
+    # MQTT fields — must match WebSocket payload shape for consistent display
+    trigger: Optional[str] = None
+    msg_id: Optional[str] = None
+    rssi_dbm: Optional[int] = None
+    lora_rssi: Optional[int] = None
+    cfg_ver: Optional[int] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

@@ -179,14 +179,13 @@ def _save_telemetry(data: dict) -> SensorReading | None:
                            data["device_id"])
             return None
 
-        # 2. Duplicate detection by msg_id
-        if data.get("msg_id"):
-            existing = db.query(SensorReading).filter(
-                SensorReading.msg_id == data["msg_id"]
-            ).first()
-            if existing:
-                logger.debug("Duplicate msg_id %s — skipping.", data["msg_id"])
-                return None
+        # NOTE: msg_id ("mid" from firmware) is stored in the DB for
+        # debugging/tracing but is NOT used for dedup.  The firmware sends a
+        # simple incrementing counter that is NOT globally unique — it resets
+        # on power-cycle and different devices share the same counter space,
+        # so checking msg_id across all devices/all-time caused silent drops.
+        # If dedup is ever needed again, scope it to (device_id + msg_id +
+        # recent time window).
 
         # 3. Build measurements dict (all non-standard sensor values)
         measurements = data["extra"] if data["extra"] else None
@@ -371,24 +370,26 @@ async def _dispatch(topic_parts: list[str], payload_str: str):
         # Update device status regardless of whether reading was saved
         await loop.run_in_executor(None, _update_device_status, data["device_id"], data)
 
-        # Broadcast to all open browser WebSocket connections
-        ws_payload = {
-            "event":      "new_reading",
-            "reading_id": reading.id if reading is not None else None,  # real DB id (fixes Date.now() bug)
-            "device_id":  data["device_id"],
-            "location":   data["location"],
-            "sensor_type":data["sensor_type"],
-            "timestamp":  data["timestamp"].isoformat() + "Z",
-            "readings":   {**data["standard"], **data["extra"]},
-            "battery_mv": data.get("battery_mv"),
-            "battery_pct":_mv_to_pct(data.get("battery_mv")),
-            "rssi_dbm":   data.get("rssi_dbm"),
-            "lora_rssi":  data.get("lora_rssi"),   # LoRa signal quality (node↔gateway), may be null
-            "signal":     _rssi_label(data.get("rssi_dbm")),
-            "trigger":    data.get("trigger", "schedule"),
-            "saved":      reading is not None,
-        }
-        await ws_manager.broadcast(ws_payload)
+        # Broadcast to browsers ONLY if the reading was saved (device is
+        # registered and no DB error).  Unregistered devices are silently
+        # ignored — no phantom rows with negative temp-IDs in the dashboard.
+        if reading is not None:
+            ws_payload = {
+                "event":      "new_reading",
+                "reading_id": reading.id,
+                "device_id":  data["device_id"],
+                "location":   data["location"],
+                "sensor_type":data["sensor_type"],
+                "timestamp":  data["timestamp"].isoformat() + "Z",
+                "readings":   {**data["standard"], **data["extra"]},
+                "battery_mv": data.get("battery_mv"),
+                "battery_pct":_mv_to_pct(data.get("battery_mv")),
+                "rssi_dbm":   data.get("rssi_dbm"),
+                "lora_rssi":  data.get("lora_rssi"),
+                "signal":     _rssi_label(data.get("rssi_dbm")),
+                "trigger":    data.get("trigger", "schedule"),
+            }
+            await ws_manager.broadcast(ws_payload)
         logger.debug("Telemetry from %s saved=%s", data["device_id"], reading is not None)
 
     # ── Config ACK: {location}/{device_id}/config/ack ──
